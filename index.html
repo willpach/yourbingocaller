@@ -52,12 +52,13 @@
   .tip button.tip-close{position:absolute;top:6px;right:6px;background:none;border:none;font-size:1rem;line-height:1;color:var(--muted);cursor:pointer;padding:4px 6px;border-radius:4px;}
   .slider-field label span{color:var(--text);font-weight:600;}
   input[type=range]{width:100%;accent-color:var(--accent);}
-  /* Caller layout. Desktop: call | board | pattern, controls underneath.
-     Tablet landscape: call over pattern on the left, board gets the rest.
-     Portrait/phone: call, then controls, then board, then a compact pattern. */
+  /* Caller layout. Desktop and tablet landscape: controls on top, then the
+     call box over the current game on the left, with the board taking the rest.
+     Portrait/phone: one stacked column. */
   .caller-row{display:grid;gap:20px;margin-bottom:20px;
-    grid-template-columns:220px minmax(0,1fr) 260px;
-    grid-template-areas:"controls controls controls" "pattern board call" "history history history";}
+    grid-template-columns:300px minmax(0,1fr);grid-template-rows:auto auto 1fr auto;
+    grid-template-areas:"controls controls" "call board" "pattern board" "history history";}
+  .caller-row #patternBar, .caller-row #numberBoardPanel{align-self:start;}
   .caller-row > .panel{margin-bottom:0;}
   .caller-row .callboard{grid-area:call;padding:0;}
   .caller-row #numberBoardPanel{grid-area:board;}
