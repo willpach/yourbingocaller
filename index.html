@@ -701,6 +701,15 @@ function subtitleFor(term){
   return display || '';
 }
 
+/* Some voices (notably macOS/iOS) read a lone letter as "capital B".
+   Speak B-I-N-G-O letters by their sound instead, and lowercase any other
+   single-letter column, so the voice just says the letter name. */
+const LETTER_SOUNDS = { B:'bee', I:'eye', N:'en', G:'gee', O:'oh' };
+function spokenLetter(letter){
+  if(!letter || letter.length !== 1) return letter;
+  return LETTER_SOUNDS[letter.toUpperCase()] || letter.toLowerCase();
+}
+
 function speakTerm(term){
   speechSynthesis.cancel();
   if(term.audioBlob){
@@ -714,7 +723,7 @@ function speakTerm(term){
   const delayMs = Math.round((parseFloat(document.getElementById('callDelayInput').value) || 0) * 1000);
 
   if(term.letter && delayMs > 0){
-    const letterUtter = new SpeechSynthesisUtterance(term.letter);
+    const letterUtter = new SpeechSynthesisUtterance(spokenLetter(term.letter));
     if(voice) letterUtter.voice = voice;
     letterUtter.rate = rate;
     letterUtter.onend = () => {
@@ -725,7 +734,7 @@ function speakTerm(term){
     };
     speechSynthesis.speak(letterUtter);
   } else {
-    const text = (term.letter ? term.letter+' '+term.text : term.text);
+    const text = (term.letter ? spokenLetter(term.letter)+' '+term.text : term.text);
     const utter = new SpeechSynthesisUtterance(text);
     if(voice) utter.voice = voice;
     utter.rate = rate;
