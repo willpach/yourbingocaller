@@ -56,8 +56,8 @@
      Tablet landscape: call over pattern on the left, board gets the rest.
      Portrait/phone: call, then controls, then board, then a compact pattern. */
   .caller-row{display:grid;gap:20px;margin-bottom:20px;
-    grid-template-columns:300px minmax(0,1fr) 210px;
-    grid-template-areas:"controls controls controls" "call board pattern" "history history history";}
+    grid-template-columns:220px minmax(0,1fr) 260px;
+    grid-template-areas:"controls controls controls" "pattern board call" "history history history";}
   .caller-row > .panel{margin-bottom:0;}
   .caller-row .callboard{grid-area:call;padding:0;}
   .caller-row #numberBoardPanel{grid-area:board;}
@@ -78,12 +78,27 @@
   .game-option:active{transform:scale(0.97);}
   .callboard{display:flex;flex-direction:column;align-items:center;gap:16px;}
   .current-call{
-    width:100%;height:100%;min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    container-type:size;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;position:relative;transition:transform 0.1s;
+    width:100%;height:100%;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;
     background:radial-gradient(circle at top, #fffbeb, #fef3c7);border:2px solid var(--accent);border-radius:16px;padding:16px;text-align:center;
   }
   .current-call .letter{font-size:clamp(1.1rem,2.4vw,1.8rem);color:var(--accent-text);letter-spacing:3px;font-weight:700;}
   .current-call .value{font-size:clamp(2.6rem,7vw,5.2rem);font-weight:800;line-height:1.05;word-break:break-word;}
   .current-call .value.small{font-size:clamp(1.6rem,4vw,2.8rem);}
+  .current-call:active{transform:scale(0.99);}
+  .current-call:focus-visible{outline:3px solid var(--accent-text);outline-offset:2px;}
+  /* Size the call to fill the box (container query units, with clamp fallback). */
+  .current-call .letter{font-size:min(13cqh,18cqw);line-height:1;}
+  .current-call .value{font-size:min(50cqh,52cqw);line-height:1;}
+  .current-call .value.small{font-size:min(14cqh,13cqw);line-height:1.15;}
+  .current-call .call-status{font-size:min(7cqh,7cqw);color:var(--muted);margin-top:4px;min-height:1.2em;}
+  .bingo-btn{position:absolute;top:10px;right:10px;background:#7c3aed;color:#fff;border:none;border-radius:999px;padding:6px 12px;font-size:0.85rem;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .bingo-btn:active{transform:scale(0.95);}
+  .current-call.not-started .bingo-btn, .current-call.is-bingo .bingo-btn{display:none;}
+  .current-call.is-bingo{background:radial-gradient(circle at top,#f5f3ff,#ddd6fe);border-color:#7c3aed;}
+  .current-call.is-bingo .value{color:#6d28d9;}
+  .current-call.is-bingo .value.small{font-size:min(22cqh,17cqw);}
+  .current-call.paused{border-style:dashed;}
   .current-call .subtitle{font-size:clamp(0.8rem,1.8vw,1.15rem);color:var(--muted);margin-top:6px;word-break:break-word;}
   .call-controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
   .call-controls button.btn{font-size:1.05rem;padding:12px 22px;}
@@ -104,13 +119,12 @@
     .caller-row{grid-template-columns:260px minmax(0,1fr);grid-template-rows:auto auto 1fr auto;
       grid-template-areas:"controls controls" "call board" "pattern board" "history history";}
     .caller-row #patternBar, .caller-row #numberBoardPanel{align-self:start;}
-    .current-call{min-height:170px;}
+    .current-call{min-height:0;height:auto;aspect-ratio:1/0.8;}
   }
   @media (orientation:portrait), (max-width:700px){
     .caller-row{grid-template-columns:minmax(0,1fr);
       grid-template-areas:"controls" "call" "board" "pattern" "history";}
-    .current-call{min-height:0;padding:14px;}
-    .current-call .value{font-size:clamp(3rem,13vw,7rem);}
+    .current-call{min-height:0;height:230px;padding:14px;}
     .caller-row #patternBar{flex-direction:row !important;flex-wrap:wrap;gap:8px 16px;text-align:left;padding:12px 16px;}
     #patternBar .history-title{display:none;}
     #patternBar #patternNote{margin:0;flex:1 1 200px;}
@@ -189,10 +203,12 @@
   <div class="tab active" id="tab-caller">
     <div class="caller-row">
       <div class="callboard panel">
-        <div class="current-call" id="currentCall">
+        <div class="current-call" id="currentCall" role="button" tabindex="0" aria-label="Start, pause or resume calling">
           <div class="letter" id="callLetter">&nbsp;</div>
-          <div class="value" id="callValue">Press Draw to start</div>
+          <div class="value small" id="callValue">▶ Tap to Start</div>
           <div class="subtitle" id="callSubtitle"></div>
+          <div class="call-status" id="callStatus"></div>
+          <button type="button" class="bingo-btn" id="bingoBtn">🎉 Bingo!</button>
         </div>
       </div>
 
@@ -825,7 +841,7 @@ function loadGameForSet(setId){
   document.getElementById('modeLabel').textContent = set.type==='standard' ? '75-Ball Numbers' : 'Custom Vocabulary';
   document.getElementById('totalCount').textContent = set.terms.length;
   document.getElementById('calledCount').textContent = 0;
-  document.getElementById('callValue').textContent = 'Press Draw to start';
+  document.getElementById('callValue').textContent = '▶ Tap to Start';
   document.getElementById('callLetter').textContent = ' ';
   document.getElementById('callSubtitle').textContent = '';
   document.getElementById('numberBoardPanel').style.display = isStructuredSet(set) ? 'block' : 'none';
@@ -833,6 +849,9 @@ function loadGameForSet(setId){
   setupNumberBoard();
   recomputePoolForPattern();
   updatePatternUI();
+  bingoCalled = false;
+  document.getElementById('callValue').classList.add('small');
+  if(typeof updateCallBox === 'function') updateCallBox();
   stopAuto();
 }
 
@@ -885,6 +904,8 @@ function announce(set, termIdx){
   chip.className = 'chip';
   chip.textContent = (term.letter?term.letter:'') + display;
   document.getElementById('historyBox').prepend(chip);
+  bingoCalled = false;
+  updateCallBox();
   speakTerm(term);
 }
 
@@ -978,9 +999,12 @@ function undoLast(){
     document.getElementById('callSubtitle').textContent = subtitleFor(t);
   } else {
     document.getElementById('callLetter').textContent = ' ';
-    document.getElementById('callValue').textContent = 'Press Draw to start';
+    document.getElementById('callValue').textContent = '▶ Tap to Start';
     document.getElementById('callSubtitle').textContent = '';
   }
+  document.getElementById('callValue').classList.toggle('small', game.called.length===0);
+  bingoCalled = false;
+  updateCallBox();
 }
 
 function resetGame(){
@@ -993,14 +1017,64 @@ function resetGame(){
 function stopAuto(){
   if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
   document.getElementById('autoBtn').textContent = '▶ Auto-Play';
+  updateCallBox();
 }
 function toggleAuto(){
   if(autoTimer){ stopAuto(); return; }
+  bingoCalled = false;
   const secs = Math.max(3, parseInt(document.getElementById('autoInterval').value)||8);
   drawNext();
   autoTimer = setInterval(drawNext, secs*1000);
   document.getElementById('autoBtn').textContent = '⏸ Stop Auto';
+  updateCallBox();
 }
+
+/* ---- Tappable call box ----
+   Before the game: "Tap to Start" starts Auto-Play.
+   During Auto-Play: tap to pause. While paused: tap to resume.
+   The 🎉 Bingo! button pauses, announces "We have a bingo!" and shows
+   BINGO in the box; tap the box to keep playing if it was a false alarm. */
+let bingoCalled = false;
+function updateCallBox(){
+  const box = document.getElementById('currentCall');
+  const status = document.getElementById('callStatus');
+  const started = game.called.length > 0;
+  box.classList.toggle('not-started', !started);
+  box.classList.toggle('is-bingo', bingoCalled);
+  box.classList.toggle('paused', started && !autoTimer && !bingoCalled);
+  if(bingoCalled) status.textContent = 'Tap to keep playing';
+  else if(!started) status.textContent = '';
+  else if(autoTimer) status.textContent = 'Tap to pause';
+  else status.textContent = '⏸ Paused · tap to resume';
+}
+function onCallBoxTap(){
+  if(autoTimer) stopAuto();
+  else toggleAuto();
+}
+function declareBingo(){
+  if(game.called.length === 0) return;
+  stopAuto();
+  bingoCalled = true;
+  const set = vocabSets.find(s=>s.id===game.currentSetId);
+  const last = set && set.terms[game.called[game.called.length-1]];
+  document.getElementById('callLetter').textContent = '🎉';
+  const valueEl = document.getElementById('callValue');
+  valueEl.textContent = 'BINGO!';
+  valueEl.classList.add('small');
+  document.getElementById('callSubtitle').textContent = last ? `Last call: ${(last.letter||'') + ' ' + primaryDisplay(last)}`.trim() : '';
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance('We have a bingo!');
+  const voice = getSelectedVoice();
+  if(voice) u.voice = voice;
+  u.rate = parseFloat(document.getElementById('rateInput').value) || 0.9;
+  speechSynthesis.speak(u);
+  updateCallBox();
+}
+document.getElementById('currentCall').addEventListener('click', onCallBoxTap);
+document.getElementById('currentCall').addEventListener('keydown', (e)=>{
+  if(e.target.id==='currentCall' && (e.key==='Enter' || e.key===' ')){ e.preventDefault(); onCallBoxTap(); }
+});
+document.getElementById('bingoBtn').addEventListener('click', (e)=>{ e.stopPropagation(); declareBingo(); });
 
 document.getElementById('drawBtn').addEventListener('click', drawNext);
 document.getElementById('autoBtn').addEventListener('click', toggleAuto);
