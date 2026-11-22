@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Record Numbers – Bingo Caller</title>
+<style>
+  :root{
+    --bg:#faf7f2; --panel:#ffffff; --text:#2b2620; --muted:#7a7066;
+    --border:#e6ded3; --accent:#c2410c; --accent2:#15803d; --rec:#dc2626;
+    --field:#f3eee6;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    -webkit-tap-highlight-color:transparent;}
+  body{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px 16px 32px;}
+  header{width:100%;max-width:900px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  header h1{font-size:1.15rem;margin:0;}
+  header a{color:var(--muted);font-size:0.9rem;}
+  .progress{color:var(--muted);font-size:0.95rem;}
+  main{width:100%;max-width:900px;display:flex;flex-direction:column;align-items:center;gap:16px;margin-top:12px;}
+  .card{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:20px;
+    padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px;
+    box-shadow:0 2px 10px rgba(60,40,20,0.06);}
+  .numrow{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;}
+  .letter{font-size:clamp(2rem,6vw,3.5rem);font-weight:700;color:var(--muted);min-width:1.2em;text-align:center;}
+  .bignum{font-size:clamp(7rem,28vw,14rem);font-weight:800;line-height:1;font-variant-numeric:tabular-nums;
+    min-width:2ch;text-align:center;}
+  .navbtn{font-size:2rem;width:64px;height:64px;border-radius:50%;border:1px solid var(--border);
+    background:var(--field);color:var(--text);cursor:pointer;flex:none;}
+  .navbtn:disabled{opacity:0.35;cursor:default;}
+  .status{font-size:1.05rem;min-height:1.5em;color:var(--muted);text-align:center;}
+  .status.ok{color:var(--accent2);font-weight:600;}
+  .status.rec{color:var(--rec);font-weight:700;}
+  .recbtn{width:140px;height:140px;border-radius:50%;border:6px solid #fff;background:var(--rec);
+    color:#fff;font-size:1.25rem;font-weight:700;cursor:pointer;
+    box-shadow:0 0 0 3px var(--rec),0 6px 18px rgba(220,38,38,0.3);transition:transform .1s;}
+  .recbtn:active{transform:scale(0.96);}
+  .recbtn.recording{border-radius:28px;animation:pulse 1.2s infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 3px var(--rec),0 0 0 0 rgba(220,38,38,0.5);}
+    50%{box-shadow:0 0 0 3px var(--rec),0 0 0 16px rgba(220,38,38,0);}}
+  .meter{width:min(320px,80%);height:10px;background:var(--field);border-radius:6px;overflow:hidden;}
+  .meter > div{height:100%;width:0;background:var(--accent2);transition:width .05s;}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+  .btn{font-size:1rem;padding:12px 18px;border-radius:12px;border:1px solid var(--border);
+    background:var(--field);color:var(--text);cursor:pointer;font-weight:600;}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn:disabled{opacity:0.4;cursor:default;}
+  .opts{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;color:var(--muted);font-size:0.95rem;}
+  .opts label{display:flex;gap:6px;align-items:center;cursor:pointer;}
+  .word{width:min(420px,100%);display:flex;flex-direction:column;gap:4px;font-size:0.9rem;color:var(--muted);}
+  .word input{font-size:1.1rem;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--field);color:var(--text);}
+  .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;}
+  .col{display:flex;flex-direction:column;gap:4px;}
+  .col h3{margin:0 0 2px;text-align:center;color:var(--muted);font-size:1rem;}
+  .cell{padding:6px 0;border-radius:8px;border:1px solid var(--border);background:var(--panel);
+    font-size:0.95rem;font-variant-numeric:tabular-nums;cursor:pointer;color:var(--text);}
+  .cell.done{background:#dcfce7;border-color:#86efac;color:#14532d;font-weight:600;}
+  .cell.current{outline:3px solid var(--accent);outline-offset:1px;}
+  .footer{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+  .hint{color:var(--muted);font-size:0.85rem;text-align:center;max-width:640px;margin:0;}
+  .error{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:12px 16px;border-radius:12px;display:none;width:100%;}
+  kbd{background:var(--field);border:1px solid var(--border);border-radius:4px;padding:0 5px;font-size:0.8rem;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎙️ Record numbers 1–75</h1>
+  <span class="progress" id="progress">0 of 75 recorded</span>
+  <a href="./">← Back to the caller</a>
+</header>
+
+<main>
+  <div class="error" id="error"></div>
+
+  <section class="card">
+    <div class="numrow">
+      <button class="navbtn" id="prevBtn" aria-label="Previous number">‹</button>
+      <div class="letter" id="letter">B</div>
+      <div class="bignum" id="bignum">1</div>
+      <div class="letter" aria-hidden="true"></div>
+      <button class="navbtn" id="nextBtn" aria-label="Next number">›</button>
+    </div>
+    <div class="status" id="status">Not recorded yet</div>
+    <button class="recbtn" id="recBtn">Record</button>
+    <div class="meter"><div id="meterBar"></div></div>
+    <div class="actions">
+      <button class="btn" id="playBtn" disabled>▶ Play</button>
+      <button class="btn" id="deleteBtn" disabled>✕ Delete</button>
+      <button class="btn" id="skipBtn">Next not recorded »</button>
+    </div>
+    <div class="opts">
+      <label><input type="checkbox" id="autoAdvance" checked> Move to next number after recording</label>
+      <label><input type="checkbox" id="autoPlay"> Play back after recording</label>
+    </div>
+    <label class="word">Written word for this number (optional, for the screen later)
+      <input type="text" id="wordInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Leave blank if not needed">
+    </label>
+    <p class="hint">Tap <b>Record</b>, say the number, tap <b>Stop</b>. Recordings save on this device as you go, so it's fine to close the page and come back.
+      On a keyboard: <kbd>Space</kbd> record/stop, <kbd>←</kbd> <kbd>→</kbd> move, <kbd>P</kbd> play.</p>
+  </section>
+
+  <section class="card">
+    <div class="grid" id="grid"></div>
+    <p class="hint">Green = recorded. Tap any number to jump to it.</p>
+  </section>
+
+  <section class="card">
+    <div class="footer">
+      <button class="btn primary" id="exportBtn" disabled>⬇ Download all as zip</button>
+      <button class="btn" id="exportOneBtn" disabled>⬇ Download this one</button>
+      <button class="btn" id="clearBtn">Start over</button>
+    </div>
+    <div class="opts">
+      <label><input type="checkbox" id="trimOpt" checked> Trim silence and even out volume</label>
+    </div>
+    <p class="hint">The zip has files named <code>1.wav</code> to <code>75.wav</code> (plus <code>words.txt</code> if you typed any words). WAV plays everywhere, and the caller's
+      "Auto-match audio files by name" button picks them up by number.</p>
+  </section>
+</main>
+
+<script>
+const TOTAL = 75;
+const LETTERS = ['B','I','N','G','O'];
+const letterFor = n => LETTERS[Math.floor((n-1)/15)];
+
+/* ---------- IndexedDB storage ---------- */
+let db;
+function openDb(){
+  return new Promise((res,rej)=>{
+    const r = indexedDB.open('bingo-recorder',1);
+    r.onupgradeneeded = ()=> r.result.createObjectStore('clips');
+    r.onsuccess = ()=> res(r.result);
+    r.onerror = ()=> rej(r.error);
+  });
+}
+function tx(mode, fn){
+  if(!db) return Promise.resolve();
+  return new Promise((res,rej)=>{
+    const t = db.transaction('clips',mode); const s = t.objectStore('clips');
+    const req = fn(s); t.oncomplete = ()=> res(req && req.result); t.onerror = ()=> rej(t.error);
+  });
+}
+const dbGet = k => tx('readonly', s=>s.get(k));
+const dbPut = (k,v) => tx('readwrite', s=>s.put(v,k));
+const dbDel = k => tx('readwrite', s=>s.delete(k));
+const dbClear = () => tx('readwrite', s=>s.clear());
+const dbKeys = () => tx('readonly', s=>s.getAllKeys());
+
+/* clips[n] = {blob, type}; words[n] = string */
+const clips = {}; let words = {};
+let current = 1;
+
+/* ---------- UI refs ---------- */
+const $ = id => document.getElementById(id);
+const recBtn=$('recBtn'), playBtn=$('playBtn'), deleteBtn=$('deleteBtn'), statusEl=$('status');
+const wordInput=$('wordInput');
+
+function buildGrid(){
+  const g = $('grid'); g.innerHTML='';
+  for(let c=0;c<5;c++){
+    const col = document.createElement('div'); col.className='col';
+    col.innerHTML = `<h3>${LETTERS[c]}</h3>`;
+    for(let n=c*15+1;n<=c*15+15;n++){
+      const b = document.createElement('button'); b.className='cell'; b.id='cell'+n; b.textContent=n;
+      b.onclick = ()=> go(n);
+      col.appendChild(b);
+    }
+    g.appendChild(col);
+  }
+}
+
+function render(){
+  $('bignum').textContent = current;
+  $('letter').textContent = letterFor(current);
+  $('prevBtn').disabled = current<=1;
+  $('nextBtn').disabled = current>=TOTAL;
+  const has = !!clips[current];
+  if(!recording){
+    statusEl.className = 'status' + (has?' ok':'');
+    statusEl.textContent = has ? '✓ Recorded' : 'Not recorded yet';
+  }
+  playBtn.disabled = !has || recording;
+  deleteBtn.disabled = !has || recording;
+  $('exportOneBtn').disabled = !has;
+  const count = Object.keys(clips).length;
+  $('progress').textContent = `${count} of ${TOTAL} recorded`;
+  $('exportBtn').disabled = count===0;
+  for(let n=1;n<=TOTAL;n++){
+    const c = $('cell'+n);
+    c.classList.toggle('done', !!clips[n]);
+    c.classList.toggle('current', n===current);
+  }
+  if(document.activeElement!==wordInput) wordInput.value = words[current]||'';
+  localStorage.setItem('bingoRecorderCurrent', current);
+}
+
+function go(n){
+  if(recording) return;
+  stopPlayback();
+  current = Math.max(1, Math.min(TOTAL, n));
+  wordInput.blur();
+  render();
+}
+
+function showError(msg){ const e=$('error'); e.textContent=msg; e.style.display='block'; }
+
+/* ---------- Recording ---------- */
+let stream=null, recorder=null, chunks=[], recording=false, audioCtx=null, analyser=null, meterRaf=0;
+
+function pickMime(){
+  if(!window.MediaRecorder) return '';
+  const opts = ['audio/mp4','audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus'];
+  for(const t of opts){ try{ if(MediaRecorder.isTypeSupported(t)) return t; }catch(e){} }
+  return '';
+}
+
+async function ensureStream(){
+  if(stream && stream.active) return stream;
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
+    throw new Error('This browser can’t use the microphone here. Open the page over https (the GitHub Pages link) in Safari or Chrome.');
+  stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  const src = audioCtx.createMediaStreamSource(stream);
+  analyser = audioCtx.createAnalyser(); analyser.fftSize = 1024;
+  src.connect(analyser);
+  return stream;
+}
+
+function runMeter(){
+  const buf = new Float32Array(analyser.fftSize);
+  const tick = ()=>{
+    analyser.getFloatTimeDomainData(buf);
+    let peak=0; for(const v of buf){ const a=Math.abs(v); if(a>peak) peak=a; }
+    $('meterBar').style.width = Math.min(100, peak*140)+'%';
+    $('meterBar').style.background = peak>0.95 ? 'var(--rec)' : 'var(--accent2)';
+    meterRaf = requestAnimationFrame(tick);
+  };
+  tick();
+}
+function stopMeter(){ cancelAnimationFrame(meterRaf); $('meterBar').style.width='0'; }
+
+async function startRecording(){
+  if(!window.MediaRecorder){ showError('This browser doesn’t support recording. Please use Safari (iPad) or Chrome.'); return; }
+  try{ await ensureStream(); }
+  catch(e){ showError('Microphone not available: '+(e.message||e)+' — check that the browser is allowed to use the microphone.'); return; }
+  if(audioCtx.state==='suspended') await audioCtx.resume();
+  stopPlayback();
+  const mime = pickMime();
+  recorder = mime ? new MediaRecorder(stream,{mimeType:mime}) : new MediaRecorder(stream);
+  chunks = [];
+  const target = current;
+  recorder.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
+  recorder.onstop = async ()=>{
+    const type = recorder.mimeType || mime || 'audio/webm';
+    const blob = new Blob(chunks,{type});
+    clips[target] = {blob, type};
+    await dbPut('clip:'+target, {blob, type});
+    recording = false;
+    recBtn.classList.remove('recording'); recBtn.textContent='Record';
+    stopMeter();
+    const autoPlay = $('autoPlay').checked;
+    if(autoPlay){ render(); await playClip(target); }
+    if($('autoAdvance').checked && target===current && target<TOTAL){
+      if(autoPlay) await waitForPlaybackEnd();
+      current = target+1;
+    }
+    render();
+    if(!autoPlay || !$('autoAdvance').checked){
+      statusEl.className='status ok'; statusEl.textContent = `✓ Saved ${target}` + (current!==target ? ` — now on ${current}` : '');
+    }
+  };
+  recorder.start();
+  recording = true;
+  recBtn.classList.add('recording'); recBtn.textContent='Stop';
+  statusEl.className='status rec'; statusEl.textContent=`● Recording ${current}…`;
+  playBtn.disabled = deleteBtn.disabled = true;
+  runMeter();
+}
+function stopRecording(){ if(recorder && recorder.state!=='inactive') recorder.stop(); }
+function toggleRecord(){ recording ? stopRecording() : startRecording(); }
+
+/* ---------- Playback ---------- */
+let player=null, playEndResolve=null;
+function stopPlayback(){ if(player){ player.pause(); player=null; } if(playEndResolve){ playEndResolve(); playEndResolve=null; } }
+function waitForPlaybackEnd(){ return player ? new Promise(r=>playEndResolve=r) : Promise.resolve(); }
+async function playClip(n){
+  stopPlayback();
+  const c = clips[n]; if(!c) return;
+  const url = URL.createObjectURL(c.blob);
+  player = new Audio(url);
+  player.onended = ()=>{ URL.revokeObjectURL(url); player=null; if(playEndResolve){ playEndResolve(); playEndResolve=null; } };
+  try{ await player.play(); }catch(e){ player=null; }
+}
+
+/* ---------- WAV conversion (trim + normalize) ---------- */
+async function toWav(clip, trim){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  const ab = await clip.blob.arrayBuffer();
+  const decoded = await new Promise((res,rej)=>{
+    const p = audioCtx.decodeAudioData(ab, res, rej);
+    if(p && p.then) p.then(res,rej);
+  });
+  const sr = decoded.sampleRate;
+  // mix down to mono
+  let data = new Float32Array(decoded.length);
+  for(let ch=0; ch<decoded.numberOfChannels; ch++){
+    const d = decoded.getChannelData(ch);
+    for(let i=0;i<d.length;i++) data[i] += d[i]/decoded.numberOfChannels;
+  }
+  if(trim && data.length){
+    // find speech by short-window RMS, relative to the loudest window
+    const win = Math.max(1, Math.round(sr*0.01));
+    const rms = [];
+    let maxR = 0;
+    for(let i=0;i<data.length;i+=win){
+      let s=0, end=Math.min(data.length,i+win);
+      for(let j=i;j<end;j++) s+=data[j]*data[j];
+      const r = Math.sqrt(s/(end-i)); rms.push(r); if(r>maxR) maxR=r;
+    }
+    const thr = Math.max(0.005, maxR*0.08);
+    let first = rms.findIndex(r=>r>thr), last = rms.length-1;
+    while(last>0 && rms[last]<=thr) last--;
+    if(first>=0){
+      const pad = Math.round(sr*0.12);
+      const start = Math.max(0, first*win - pad);
+      const stop = Math.min(data.length, (last+1)*win + pad);
+      data = data.slice(start, stop);
+    }
+    // short fades so there are no clicks
+    const fade = Math.min(Math.round(sr*0.01), Math.floor(data.length/2));
+    for(let i=0;i<fade;i++){ const g=i/fade; data[i]*=g; data[data.length-1-i]*=g; }
+    // normalize peak to about -1 dBFS
+    let peak=0; for(const v of data){ const a=Math.abs(v); if(a>peak) peak=a; }
+    if(peak>0.001){ const g=0.89/peak; for(let i=0;i<data.length;i++) data[i]*=g; }
+  }
+  return encodeWav(data, sr);
+}
+function encodeWav(samples, sr){
+  const buf = new ArrayBuffer(44 + samples.length*2), v = new DataView(buf);
+  const w = (o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4,36+samples.length*2,true); w(8,'WAVE'); w(12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  w(36,'data'); v.setUint32(40,samples.length*2,true);
+  for(let i=0;i<samples.length;i++){
+    const s=Math.max(-1,Math.min(1,samples[i])); v.setInt16(44+i*2, s<0?s*0x8000:s*0x7fff, true);
+  }
+  return new Uint8Array(buf);
+}
+function extFor(type){ return /mp4|aac|m4a/.test(type)?'m4a':/ogg/.test(type)?'ogg':'webm'; }
+
+/* ---------- Minimal zip writer (store, no compression) ---------- */
+const CRC_TABLE = (()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(u8){ let c=0xFFFFFFFF; for(let i=0;i<u8.length;i++) c = CRC_TABLE[(c^u8[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function makeZip(files){ // files: [{name, data:Uint8Array}]
+  const enc = new TextEncoder(), parts=[], central=[]; let offset=0;
+  for(const f of files){
+    const name = enc.encode(f.name), crc = crc32(f.data), size = f.data.length;
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0,0x04034b50,true); h.setUint16(4,20,true); h.setUint16(6,0x0800,true); h.setUint16(8,0,true);
+    h.setUint16(10,0,true); h.setUint16(12,0x21,true); h.setUint32(14,crc,true);
+    h.setUint32(18,size,true); h.setUint32(22,size,true); h.setUint16(26,name.length,true); h.setUint16(28,0,true);
+    parts.push(new Uint8Array(h.buffer), name, f.data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0,0x02014b50,true); c.setUint16(4,20,true); c.setUint16(6,20,true); c.setUint16(8,0x0800,true);
+    c.setUint16(10,0,true); c.setUint16(12,0,true); c.setUint16(14,0x21,true); c.setUint32(16,crc,true);
+    c.setUint32(20,size,true); c.setUint32(24,size,true); c.setUint16(28,name.length,true);
+    c.setUint32(42,offset,true);
+    central.push(new Uint8Array(c.buffer), name);
+    offset += 30 + name.length + size;
+  }
+  const cdSize = central.reduce((a,p)=>a+p.length,0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true); e.setUint16(8,files.length,true); e.setUint16(10,files.length,true);
+  e.setUint32(12,cdSize,true); e.setUint32(16,offset,true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)], {type:'application/zip'});
+}
+
+function download(blob, name){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 60000);
+}
+
+async function clipFile(n){
+  const c = clips[n];
+  try{ return {name:`${n}.wav`, data: await toWav(c, $('trimOpt').checked)}; }
+  catch(e){ // fall back to the original recording if it can't be decoded
+    return {name:`${n}.${extFor(c.type)}`, data: new Uint8Array(await c.blob.arrayBuffer())};
+  }
+}
+
+async function exportAll(){
+  const btn = $('exportBtn'); btn.disabled=true;
+  const files=[];
+  const nums = Object.keys(clips).map(Number).sort((a,b)=>a-b);
+  for(const n of nums){ btn.textContent=`Preparing ${n}…`; files.push(await clipFile(n)); }
+  const lines = [];
+  for(let n=1;n<=TOTAL;n++) if(words[n]) lines.push(`${n}\t${words[n]}`);
+  if(lines.length) files.push({name:'words.txt', data:new TextEncoder().encode(lines.join('\n')+'\n')});
+  download(makeZip(files), 'bingo-numbers.zip');
+  btn.textContent='⬇ Download all as zip'; btn.disabled=false;
+}
+async function exportOne(){
+  if(!clips[current]) return;
+  const f = await clipFile(current);
+  download(new Blob([f.data],{type: f.name.endsWith('.wav')?'audio/wav':clips[current].type}), f.name);
+}
+
+/* ---------- Wiring ---------- */
+recBtn.onclick = toggleRecord;
+playBtn.onclick = ()=> playClip(current);
+deleteBtn.onclick = async ()=>{
+  if(!confirm(`Delete the recording for ${current}?`)) return;
+  delete clips[current]; await dbDel('clip:'+current); render();
+};
+$('prevBtn').onclick = ()=> go(current-1);
+$('nextBtn').onclick = ()=> go(current+1);
+$('skipBtn').onclick = ()=>{
+  for(let i=1;i<=TOTAL;i++){ const n=((current-1+i)%TOTAL)+1; if(!clips[n]){ go(n); return; } }
+  statusEl.className='status ok'; statusEl.textContent='🎉 All 75 are recorded!';
+};
+$('exportBtn').onclick = exportAll;
+$('exportOneBtn').onclick = exportOne;
+$('clearBtn').onclick = async ()=>{
+  if(!confirm('Delete ALL recordings and words and start over? Download the zip first if you want to keep them.')) return;
+  await dbClear(); for(const k in clips) delete clips[k]; words={}; go(1);
+};
+wordInput.addEventListener('input', ()=>{
+  const v = wordInput.value.trim();
+  if(v) words[current]=v; else delete words[current];
+  dbPut('words', words);
+});
+document.addEventListener('keydown', e=>{
+  if(e.target===wordInput){ if(e.key==='Enter'||e.key==='Escape') wordInput.blur(); return; }
+  if(e.key===' '){ e.preventDefault(); toggleRecord(); }
+  else if(e.key==='ArrowRight'){ e.preventDefault(); go(current+1); }
+  else if(e.key==='ArrowLeft'){ e.preventDefault(); go(current-1); }
+  else if(e.key==='p'||e.key==='P'){ playClip(current); }
+});
+// space bar shouldn't also "click" a focused button
+document.addEventListener('keyup', e=>{ if(e.key===' ' && e.target!==wordInput) e.preventDefault(); });
+document.querySelectorAll('button').forEach(b=> b.addEventListener('keydown', e=>{ if(e.key===' ') e.preventDefault(); }));
+
+(async ()=>{
+  buildGrid();
+  try{
+    db = await openDb();
+    const keys = await dbKeys();
+    for(const k of keys){
+      if(k==='words'){ words = (await dbGet('words'))||{}; }
+      else if(String(k).startsWith('clip:')){ clips[Number(String(k).slice(5))] = await dbGet(k); }
+    }
+  }catch(e){ showError('Could not open saved recordings on this device ('+e+'). Recording still works, but download before closing the page.'); }
+  const saved = Number(localStorage.getItem('bingoRecorderCurrent'));
+  current = saved>=1 && saved<=TOTAL ? saved : 1;
+  render();
+})();
+</script>
+</body>
+</html>
