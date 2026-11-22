@@ -701,10 +701,13 @@ function subtitleFor(term){
   return display || '';
 }
 
-/* Some voices (notably macOS/iOS) read a lone uppercase letter as
-   "capital B". Lowercasing a single-letter column makes them say just "B". */
+/* Some voices (notably macOS/iOS) read a lone letter as "capital B".
+   Speak B-I-N-G-O letters by their sound instead, and lowercase any other
+   single-letter column, so the voice just says the letter name. */
+const LETTER_SOUNDS = { B:'bee', I:'eye', N:'en', G:'gee', O:'oh' };
 function spokenLetter(letter){
-  return (letter && letter.length === 1) ? letter.toLowerCase() : letter;
+  if(!letter || letter.length !== 1) return letter;
+  return LETTER_SOUNDS[letter.toUpperCase()] || letter.toLowerCase();
 }
 
 function speakTerm(term){
