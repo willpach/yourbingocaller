@@ -44,6 +44,12 @@
   .settings-group .row{align-items:flex-end;}
   .settings-group .row + .row{margin-top:12px;}
   .slider-field{flex:1 1 160px;}
+  .tips-box:empty{display:none;}
+  .tips-box{margin-top:14px;display:flex;flex-direction:column;gap:8px;}
+  .tip{position:relative;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 36px 10px 12px;font-size:0.85rem;line-height:1.45;color:var(--text);}
+  .tip strong{display:block;margin-bottom:2px;}
+  .tip .tip-path{font-weight:600;color:var(--accent-text);}
+  .tip button.tip-close{position:absolute;top:6px;right:6px;background:none;border:none;font-size:1rem;line-height:1;color:var(--muted);cursor:pointer;padding:4px 6px;border-radius:4px;}
   .slider-field label span{color:var(--text);font-weight:600;}
   input[type=range]{width:100%;accent-color:var(--accent);}
   /* Caller layout. Desktop: call | board | pattern, controls underneath.
@@ -262,6 +268,7 @@
               <input type="range" id="callDelayInput" min="0" max="3" step="0.1" value="0.4">
             </div>
           </div>
+          <div id="tipsBox" class="tips-box"></div>
         </div>
         <div class="settings-group">
           <h4>🎲 Game</h4>
@@ -722,7 +729,50 @@ function updateSettingLabels(){
   document.getElementById('callDelayLabel').textContent = parseFloat(document.getElementById('callDelayInput').value).toFixed(1) + 's';
   document.getElementById('autoIntervalLabel').textContent = document.getElementById('autoInterval').value + 's';
 }
+/* ---------------- Tips ----------------
+   Short, device-aware suggestions shown under the Voice settings. Each tip
+   has a test for when it applies; dismissed tips are remembered. Add new
+   tips to this list. */
+const TIPS_KEY = 'bingoCallerDismissedTips';
+const ua = navigator.userAgent;
+const isIOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+const isMac = /Macintosh/.test(ua) && !isIOS;
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const TIPS = [
+  { id:'ios-enhanced-voice', when: () => isIOS,
+    html: `<strong>💡 Get a better-sounding voice</strong>
+      On iPad and iPhone, download a higher-quality voice: open
+      <span class="tip-path">Settings › Accessibility › Spoken Content › Voices</span>,
+      pick your language, and download a voice marked <em>Enhanced</em> or <em>Premium</em>.
+      Then reload this page and choose it in the Voice list above.` },
+  { id:'mac-enhanced-voice', when: () => isMac,
+    html: `<strong>💡 Get a better-sounding voice</strong>
+      On a Mac, open <span class="tip-path">System Settings › Accessibility › Spoken Content</span>,
+      click the <em>System Voice</em> menu › <em>Manage Voices…</em>, and download an
+      <em>Enhanced</em> or <em>Premium</em> voice. Then reload this page and choose it in the Voice list above.` },
+  { id:'ios-home-screen', when: () => isIOS && !isStandalone,
+    html: `<strong>💡 Run it full screen</strong>
+      Tap the Share button and choose <span class="tip-path">Add to Home Screen</span>
+      to open the caller like an app, without the browser bars.` },
+];
+function dismissedTips(){
+  try { return JSON.parse(localStorage.getItem(TIPS_KEY)) || []; } catch(e){ return []; }
+}
+function renderTips(){
+  const box = document.getElementById('tipsBox');
+  const hidden = dismissedTips();
+  box.innerHTML = TIPS.filter(t => t.when() && !hidden.includes(t.id)).map(t =>
+    `<div class="tip">${t.html}<button type="button" class="tip-close" data-tip="${t.id}" aria-label="Dismiss tip">✕</button></div>`
+  ).join('');
+  box.querySelectorAll('.tip-close').forEach(btn => btn.addEventListener('click', () => {
+    const list = dismissedTips(); list.push(btn.dataset.tip);
+    try { localStorage.setItem(TIPS_KEY, JSON.stringify(list)); } catch(e){}
+    renderTips();
+  }));
+}
+
 function initVoiceSettings(){
+  renderTips();
   const saved = loadVoiceSettings();
   if(saved.rate) document.getElementById('rateInput').value = saved.rate;
   if(saved.callDelay !== undefined) document.getElementById('callDelayInput').value = saved.callDelay;
