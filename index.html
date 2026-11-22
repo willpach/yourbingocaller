@@ -35,12 +35,15 @@
   button.icon-btn{background:none;border:1px solid var(--border2);color:var(--text);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.85rem;}
 
   /* CALLER TAB */
-  .settings-panel{padding:14px 20px;}
-  .settings-panel summary{cursor:pointer;font-weight:600;color:var(--text);list-style:none;display:flex;align-items:center;gap:8px;}
-  .settings-panel summary::-webkit-details-marker{display:none;}
-  .settings-panel summary::before{content:'▸';color:var(--accent);transition:transform 0.15s;display:inline-block;}
-  .settings-panel[open] summary::before{transform:rotate(90deg);}
-  .settings-panel .row{margin-top:16px;}
+  .settings-panel h3{margin:0 0 4px;font-size:1.05rem;}
+  .settings-groups{display:flex;gap:20px;flex-wrap:wrap;margin-top:12px;}
+  .settings-group{flex:1 1 380px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+  .settings-group h4{margin:0 0 10px;font-size:0.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  .settings-group .row{align-items:flex-end;}
+  .settings-group .row + .row{margin-top:12px;}
+  .slider-field{flex:1 1 160px;}
+  .slider-field label span{color:var(--text);font-weight:600;}
+  input[type=range]{width:100%;accent-color:var(--accent);}
   .caller-row{display:flex;gap:20px;align-items:stretch;flex-wrap:wrap;}
   .caller-row .callboard{flex:0 0 300px;padding:0;}
   .caller-row #numberBoardPanel{flex:1 1 420px;min-width:280px;margin-bottom:0;}
@@ -186,35 +189,50 @@
       </div>
     </div>
 
-    <details class="settings-panel panel">
-      <summary>Settings — active set, voice, speed, auto-call timing</summary>
-      <div class="row">
-        <div>
-          <label>Active Set</label>
-          <select id="activeSetSelect" style="min-width:220px;"></select>
+    <div class="panel settings-panel">
+      <h3>⚙️ Settings</h3>
+      <div class="settings-groups">
+        <div class="settings-group">
+          <h4>🔊 Voice</h4>
+          <div class="row">
+            <div style="flex:1 1 240px;">
+              <label for="voiceSelect">Voice</label>
+              <select id="voiceSelect"></select>
+            </div>
+            <button class="btn secondary" id="testVoiceBtn" type="button">▶ Test Voice</button>
+          </div>
+          <div class="row">
+            <div class="slider-field">
+              <label for="rateInput">Speed: <span id="rateLabel">0.9×</span></label>
+              <input type="range" id="rateInput" min="0.5" max="1.5" step="0.05" value="0.9">
+            </div>
+            <div class="slider-field">
+              <label for="callDelayInput">Pause between letter &amp; number: <span id="callDelayLabel">0.4s</span></label>
+              <input type="range" id="callDelayInput" min="0" max="3" step="0.1" value="0.4">
+            </div>
+          </div>
         </div>
-        <div>
-          <label>Voice (for text-to-speech items)</label>
-          <select id="voiceSelect" style="min-width:220px;"></select>
-        </div>
-        <div>
-          <label>Speech Rate</label>
-          <input type="number" id="rateInput" min="0.5" max="2" step="0.1" value="0.9" style="width:80px;">
-        </div>
-        <div>
-          <label>Auto-call every (sec)</label>
-          <input type="number" id="autoInterval" min="3" max="60" value="8" style="width:80px;">
-        </div>
-        <div>
-          <label>Pause between column &amp; number (sec)</label>
-          <input type="number" id="callDelayInput" min="0" max="3" step="0.1" value="0.4" style="width:80px;">
-        </div>
-        <div>
-          <label>Game Pattern</label>
-          <select id="patternSelect" style="min-width:220px;"></select>
+        <div class="settings-group">
+          <h4>🎲 Game</h4>
+          <div class="row">
+            <div style="flex:1 1 200px;">
+              <label for="activeSetSelect">Active Set</label>
+              <select id="activeSetSelect"></select>
+            </div>
+            <div style="flex:1 1 200px;">
+              <label for="patternSelect">Game Pattern</label>
+              <select id="patternSelect"></select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="slider-field">
+              <label for="autoInterval">Auto-Play: call every <span id="autoIntervalLabel">8s</span></label>
+              <input type="range" id="autoInterval" min="3" max="60" step="1" value="8">
+            </div>
+          </div>
         </div>
       </div>
-    </details>
+    </div>
   </div>
 
   <!-- CARDS TAB -->
@@ -539,6 +557,7 @@ async function init(){
   vocabSets = [STANDARD_SET, ...stored];
   customPatterns = storedPatterns;
   refreshSetSelectors();
+  initVoiceSettings();
   populateVoices();
   setupNumberBoard();
   renderSetList();
@@ -569,6 +588,9 @@ function populateVoices(){
     const voices = speechSynthesis.getVoices();
     sel.innerHTML = '<option value="">Default</option>' + voices.map((v,i)=>`<option value="${i}">${v.name} (${v.lang})</option>`).join('');
     sel.dataset.voices = JSON.stringify(voices.map(v=>({name:v.name,lang:v.lang})));
+    const saved = loadVoiceSettings().voiceName;
+    const idx = saved ? voices.findIndex(v=>v.name===saved) : -1;
+    if(idx >= 0) sel.value = String(idx);
   }
   load();
   speechSynthesis.onvoiceschanged = load;
@@ -579,6 +601,42 @@ function getSelectedVoice(){
   if(idx==='') return null;
   const voices = speechSynthesis.getVoices();
   return voices[idx] || null;
+}
+
+/* ---------------- Voice & timing settings (saved between visits) ---------------- */
+const SETTINGS_KEY = 'bingoCallerSettings';
+function loadVoiceSettings(){
+  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch(e){ return {}; }
+}
+function saveVoiceSettings(){
+  const sel = document.getElementById('voiceSelect');
+  const opt = sel.selectedOptions[0];
+  const voices = speechSynthesis.getVoices();
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      voiceName: (sel.value!=='' && voices[sel.value]) ? voices[sel.value].name : '',
+      rate: document.getElementById('rateInput').value,
+      callDelay: document.getElementById('callDelayInput').value,
+      autoInterval: document.getElementById('autoInterval').value,
+    }));
+  } catch(e){}
+}
+function updateSettingLabels(){
+  document.getElementById('rateLabel').textContent = parseFloat(document.getElementById('rateInput').value).toFixed(2).replace(/0$/,'') + '×';
+  document.getElementById('callDelayLabel').textContent = parseFloat(document.getElementById('callDelayInput').value).toFixed(1) + 's';
+  document.getElementById('autoIntervalLabel').textContent = document.getElementById('autoInterval').value + 's';
+}
+function initVoiceSettings(){
+  const saved = loadVoiceSettings();
+  if(saved.rate) document.getElementById('rateInput').value = saved.rate;
+  if(saved.callDelay !== undefined) document.getElementById('callDelayInput').value = saved.callDelay;
+  if(saved.autoInterval) document.getElementById('autoInterval').value = saved.autoInterval;
+  updateSettingLabels();
+  ['rateInput','callDelayInput','autoInterval'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', ()=>{ updateSettingLabels(); saveVoiceSettings(); });
+  });
+  document.getElementById('voiceSelect').addEventListener('change', saveVoiceSettings);
+  document.getElementById('testVoiceBtn').addEventListener('click', ()=>speakTerm({letter:'B', text:'12'}));
 }
 
 /* ---------------- Set selectors ---------------- */
