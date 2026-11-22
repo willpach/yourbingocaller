@@ -73,6 +73,19 @@
   .game-dialog-head{display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:-20px;background:var(--panel);padding:4px 0 8px;z-index:1;}
   .game-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
   .game-option{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px;background:var(--panel2);border:2px solid var(--border);border-radius:10px;cursor:pointer;font:inherit;color:var(--text);font-size:0.85rem;font-weight:600;text-align:center;}
+  .picker-modes{display:flex;gap:6px;margin:4px 0 12px;background:var(--panel2);padding:4px;border-radius:10px;width:fit-content;max-width:100%;flex-wrap:wrap;}
+  .mode-btn{border:none;background:none;padding:8px 14px;border-radius:8px;font:inherit;font-weight:600;font-size:0.9rem;color:var(--muted);cursor:pointer;}
+  .mode-btn.active{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(15,23,42,0.12);}
+  .game-list-builder{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px;}
+  .game-list-items{margin:0 0 10px;padding-left:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px;}
+  .game-list-items:empty::before{content:'No games yet — tap one below.';color:var(--muted);font-size:0.85rem;}
+  .game-list-items li{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--border2);border-radius:999px;padding:4px 6px 4px 12px;font-size:0.85rem;font-weight:600;}
+  .game-list-items li .final{color:var(--accent-text);font-weight:700;font-size:0.75rem;text-transform:uppercase;}
+  .game-list-items li button{border:none;background:var(--panel2);border-radius:999px;width:22px;height:22px;cursor:pointer;color:var(--muted);}
+  .game-option .list-num{position:absolute;top:6px;left:6px;background:var(--accent);color:#1a1a1a;border-radius:999px;font-size:0.7rem;padding:1px 7px;font-weight:700;}
+  .game-option{position:relative;}
+  .game-list-status{font-size:0.85rem;font-weight:600;color:var(--accent-text);}
+  .game-list-status:empty{display:none;}
   .game-option small{font-weight:400;color:var(--muted);font-size:0.75rem;}
   .game-option.selected{border-color:var(--accent);background:#fffbeb;}
   .game-option:active{transform:scale(0.97);}
@@ -99,6 +112,7 @@
   .current-call.is-bingo .value{color:#6d28d9;}
   .current-call.is-bingo .value.small{font-size:min(22cqh,17cqw);}
   .current-call.paused{border-style:dashed;}
+  .next-game-in-box{margin-top:8px;background:#7c3aed;color:#fff;padding:8px 16px;font-size:0.95rem;}
   .current-call .subtitle{font-size:clamp(0.8rem,1.8vw,1.15rem);color:var(--muted);margin-top:6px;word-break:break-word;}
   .call-controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
   .call-controls button.btn{font-size:1.05rem;padding:12px 22px;}
@@ -209,6 +223,7 @@
           <div class="subtitle" id="callSubtitle"></div>
           <div class="call-status" id="callStatus"></div>
           <button type="button" class="bingo-btn" id="bingoBtn">🎉 Bingo!</button>
+          <button type="button" class="btn next-game-in-box" id="nextGameInBox" hidden>Next Game →</button>
         </div>
       </div>
 
@@ -226,6 +241,7 @@
         </div>
         <label id="rotateRow" class="rotate-row"><input type="checkbox" id="rotateToggle"> Any direction wins</label>
         <div id="patternNote" class="hint"></div>
+        <div id="gameListStatus" class="game-list-status"></div>
         <button type="button" class="btn secondary" id="changeGameBtn">🎯 Change Game</button>
       </div>
 
@@ -258,6 +274,18 @@
       <div class="game-dialog-head">
         <h3 style="margin:0;">Choose a Game</h3>
         <button type="button" class="btn secondary" id="gamePickerClose">✕ Close</button>
+      </div>
+      <div class="picker-modes" role="tablist">
+        <button type="button" class="mode-btn active" data-mode="single">One game</button>
+        <button type="button" class="mode-btn" data-mode="list">Game list (several in a row)</button>
+      </div>
+      <div id="gameListBuilder" class="game-list-builder" hidden>
+        <p class="hint" style="margin-top:0;">Tap games below to add them in order. Called numbers carry over between games; the last one is the final game.</p>
+        <ol id="gameListItems" class="game-list-items"></ol>
+        <div class="row">
+          <button type="button" class="btn green" id="startGameListBtn">▶ Start Games</button>
+          <button type="button" class="btn secondary" id="clearGameListBtn">Clear List</button>
+        </div>
       </div>
       <div id="gamePickerList"></div>
     </dialog>
@@ -1042,7 +1070,9 @@ function updateCallBox(){
   box.classList.toggle('not-started', !started);
   box.classList.toggle('is-bingo', bingoCalled);
   box.classList.toggle('paused', started && !autoTimer && !bingoCalled);
-  if(bingoCalled) status.textContent = 'Tap to keep playing';
+  const moreGames = progressionIndex>=0 && progressionIndex < gameProgression.length-1;
+  document.getElementById('nextGameInBox').hidden = !(bingoCalled && moreGames);
+  if(bingoCalled) status.textContent = moreGames ? 'Tap to keep playing this game' : 'Tap to keep playing';
   else if(!started) status.textContent = '';
   else if(autoTimer) status.textContent = 'Tap to pause';
   else status.textContent = '⏸ Paused · tap to resume';
@@ -1075,6 +1105,19 @@ document.getElementById('currentCall').addEventListener('keydown', (e)=>{
   if(e.target.id==='currentCall' && (e.key==='Enter' || e.key===' ')){ e.preventDefault(); onCallBoxTap(); }
 });
 document.getElementById('bingoBtn').addEventListener('click', (e)=>{ e.stopPropagation(); declareBingo(); });
+document.getElementById('nextGameInBox').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  document.getElementById('nextGameBtn').click();
+  bingoCalled = false;
+  const set = vocabSets.find(s=>s.id===game.currentSetId);
+  const last = set && set.terms[game.called[game.called.length-1]];
+  if(last){
+    document.getElementById('callLetter').textContent = last.letter || ' ';
+    const v = document.getElementById('callValue'); v.textContent = primaryDisplay(last); v.classList.remove('small');
+    document.getElementById('callSubtitle').textContent = subtitleFor(last);
+  }
+  updateCallBox();
+});
 
 document.getElementById('drawBtn').addEventListener('click', drawNext);
 document.getElementById('autoBtn').addEventListener('click', toggleAuto);
@@ -1724,14 +1767,7 @@ document.getElementById('clearProgressionBtn').addEventListener('click', ()=>{
 });
 
 document.getElementById('startProgressionBtn').addEventListener('click', ()=>{
-  if(gameProgression.length===0){ toast('Add at least one game to the progression first.'); return; }
-  progressionIndex = 0;
-  activePatternId = gameProgression[0];
-  document.getElementById('patternSelect').value = activePatternId;
-  recomputePoolForPattern();
-  updatePatternUI();
-  renderProgressionList();
-  toast('Progression started: ' + getPatternById(activePatternId).name);
+  if(!startProgression()) return;
   document.querySelector('.navbtn[data-tab="caller"]').click();
 });
 
@@ -1780,24 +1816,78 @@ function setActivePattern(id){
   updatePatternUI();
 }
 
+/* Picker shows the most-played shapes first. */
+const CATEGORY_ORDER = ['Classic','Letters','Shapes','Lines','Column Combos','Custom'];
+let pickerMode = 'single';
+function setPickerMode(mode){
+  pickerMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
+  document.getElementById('gameListBuilder').hidden = mode !== 'list';
+  renderGamePickerList();
+}
+function renderGameListBuilder(){
+  const ol = document.getElementById('gameListItems');
+  ol.innerHTML = gameProgression.map((pid,i)=>`<li>${i+1}. ${getPatternById(pid).name}${i===gameProgression.length-1 && gameProgression.length>1 ? ' <span class="final">final</span>' : ''}<button type="button" aria-label="Remove" data-i="${i}">✕</button></li>`).join('');
+  ol.querySelectorAll('button').forEach(b=>b.addEventListener('click', ()=>{ removeFromProgression(+b.dataset.i); renderGameListBuilder(); renderGamePickerList(); }));
+}
+function startProgression(){
+  if(gameProgression.length===0){ toast('Add at least one game first.'); return false; }
+  progressionIndex = 0;
+  activePatternId = gameProgression[0];
+  document.getElementById('patternSelect').value = activePatternId;
+  recomputePoolForPattern();
+  updatePatternUI();
+  renderProgressionList();
+  toast('Game 1: ' + getPatternById(activePatternId).name);
+  return true;
+}
 function openGamePicker(){
+  setPickerMode(progressionIndex>=0 ? 'list' : 'single');
+  renderGameListBuilder();
+  document.getElementById('gamePickerDialog').showModal();
+}
+function renderGamePickerList(){
   const groups = {};
   allPatterns().forEach(p=>{ const cat = p.category || 'Custom'; (groups[cat] = groups[cat] || []).push(p); });
+  const cats = Object.keys(groups).sort((a,b)=>{
+    const ia = CATEGORY_ORDER.indexOf(a), ib = CATEGORY_ORDER.indexOf(b);
+    return (ia<0?99:ia) - (ib<0?99:ib);
+  });
   const list = document.getElementById('gamePickerList');
-  list.innerHTML = Object.keys(groups).map(cat => `
+  const listMode = pickerMode === 'list';
+  list.innerHTML = cats.map(cat => `
     <div class="pattern-category-title">${cat}</div>
-    <div class="game-grid">${groups[cat].map(p => `
-      <button type="button" class="game-option${p.id===activePatternId?' selected':''}" data-id="${p.id}">
+    <div class="game-grid">${groups[cat].map(p => {
+      const nums = gameProgression.map((pid,i)=>pid===p.id?i+1:null).filter(Boolean);
+      const selected = listMode ? nums.length>0 : p.id===activePatternId;
+      return `
+      <button type="button" class="game-option${selected?' selected':''}" data-id="${p.id}">
+        ${listMode && nums.length ? `<span class="list-num">${nums.join(', ')}</span>` : ''}
         ${renderPatternPreview(p, 14, patternVariants(p)[0])}
         <span>${p.name}</span>
         ${(p.anyLine || rotationAllowed(p)) ? `<small>${patternVariants(p).length} ways to win</small>` : ''}
-      </button>`).join('')}</div>`).join('');
+      </button>`; }).join('')}</div>`).join('');
   list.querySelectorAll('.game-option').forEach(btn => btn.addEventListener('click', ()=>{
+    if(pickerMode === 'list'){
+      gameProgression.push(btn.dataset.id);
+      renderProgressionList();
+      renderGameListBuilder();
+      renderGamePickerList();
+      return;
+    }
+    if(progressionIndex>=0){ progressionIndex = -1; renderProgressionList(); }
     setActivePattern(btn.dataset.id);
     document.getElementById('gamePickerDialog').close();
   }));
-  document.getElementById('gamePickerDialog').showModal();
 }
+document.querySelectorAll('.mode-btn').forEach(b=>b.addEventListener('click', ()=>setPickerMode(b.dataset.mode)));
+document.getElementById('startGameListBtn').addEventListener('click', ()=>{
+  if(startProgression()) document.getElementById('gamePickerDialog').close();
+});
+document.getElementById('clearGameListBtn').addEventListener('click', ()=>{
+  gameProgression = []; progressionIndex = -1;
+  renderProgressionList(); renderGameListBuilder(); renderGamePickerList(); updatePatternUI();
+});
 function updatePatternUI(){
   const set = vocabSets.find(s=>s.id===game.currentSetId);
   const bar = document.getElementById('patternBar');
@@ -1823,6 +1913,12 @@ function updatePatternUI(){
   document.getElementById('rotateToggle').checked = rotationAllowed(pattern);
   startPatternAnimation(pattern, variants);
   const progControls = document.getElementById('progressionControls');
+  const listStatus = document.getElementById('gameListStatus');
+  if(progressionIndex>=0 && gameProgression.length>0){
+    const last = progressionIndex === gameProgression.length-1;
+    listStatus.textContent = `Game ${progressionIndex+1} of ${gameProgression.length}` +
+      (last ? ' · Final game' : ` · Up next: ${getPatternById(gameProgression[progressionIndex+1]).name}`);
+  } else listStatus.textContent = '';
   if(progressionIndex>=0 && gameProgression.length>0){
     progControls.style.display = 'flex';
     document.getElementById('progressionStatus').textContent = `Game ${progressionIndex+1} of ${gameProgression.length}`;
