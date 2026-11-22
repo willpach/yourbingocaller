@@ -123,6 +123,7 @@
   .chip{background:var(--panel2);border:1px solid var(--border2);border-radius:20px;padding:4px 10px;font-size:0.85rem;}
   .board-grid{display:grid;grid-template-columns:repeat(15,minmax(34px,1fr));gap:5px;width:100%;}
   .board-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--panel2);border-radius:4px;font-size:0.8rem;color:var(--muted);border:1px solid var(--border);}
+  .board-90 .board-cell{aspect-ratio:1.7;font-size:0.9rem;}
   .board-cell.called{background:var(--accent);color:#1a1a1a;font-weight:700;}
   #numberBoardPanel{overflow-x:auto;}
   #patternBar{display:flex;flex-direction:column;align-items:center;text-align:center;justify-content:center;gap:6px;}
@@ -159,6 +160,9 @@
   .bingo-card table{width:100%;border-collapse:collapse;table-layout:fixed;}
   .bingo-card td{border:1px solid #cbd5e1;text-align:center;font-size:0.75rem;padding:6px 2px;height:44px;vertical-align:middle;overflow:hidden;word-break:break-word;}
   .bingo-card td.free{background:#fef3c7;font-weight:700;}
+  .bingo-card.ball90{grid-column:span 2;}
+  .bingo-card.ball90 td{font-size:1rem;font-weight:600;height:40px;}
+  .bingo-card.ball90 td.blank{background:#f1f5f9;}
   .bingo-card .card-id{text-align:center;font-size:0.65rem;color:#64748b;margin-top:4px;}
 
   /* VOCAB TAB */
@@ -285,6 +289,7 @@
         <div class="row">
           <button type="button" class="btn green" id="startGameListBtn">▶ Start Games</button>
           <button type="button" class="btn secondary" id="clearGameListBtn">Clear List</button>
+          <button type="button" class="btn secondary" id="preset90Btn" hidden>Classic 90-ball: 1 line → 2 lines → full house</button>
         </div>
       </div>
       <div id="gamePickerList"></div>
@@ -518,6 +523,13 @@ let game = { pool: [], called: [], currentSetId: 'standard75' };
 let autoTimer = null;
 
 const STANDARD_SET = { id:'standard75', name:'Standard 75-Ball Bingo (B-I-N-G-O)', type:'standard', terms: buildStandardTerms() };
+/* 90-ball (UK-style) bingo: numbers 1-90, no column letters. Tickets are
+   3 rows x 9 columns with 5 numbers per row; games are one line, two lines
+   and full house. */
+const STANDARD90_SET = { id:'standard90', name:'90-Ball Bingo (1-90)', type:'standard90',
+  terms: Array.from({length:90},(_,i)=>({ text:String(i+1), number:String(i+1), letter:null, audioBlob:null, audioName:null })) };
+function isBuiltinSet(s){ return s.type==='standard' || s.type==='standard90'; }
+function is90Ball(set){ return !!set && set.type==='standard90'; }
 
 function buildStandardTerms(){
   const cols = ['B','I','N','G','O'];
@@ -577,7 +589,16 @@ let gameProgression = []; // ordered array of pattern ids for a multi-game sessi
 let progressionIndex = -1; // -1 = no progression running
 
 function allPatterns(){ return BUILTIN_PATTERNS.concat(customPatterns); }
-function getPatternById(id){ return allPatterns().find(p=>p.id===id) || BUILTIN_PATTERNS[0]; }
+function getPatternById(id){ return allPatterns().concat(BALL90_PATTERNS).find(p=>p.id===id) || BUILTIN_PATTERNS[0]; }
+/* 90-ball games, drawn on a 3x9 ticket. Each lists every way it can be won. */
+const R90 = '111111111', E90 = '000000000';
+const BALL90_PATTERNS = [
+  { id:'ball90-one-line', name:'One Line', category:'90-Ball', variants:[[R90,E90,E90],[E90,R90,E90],[E90,E90,R90]] },
+  { id:'ball90-two-lines', name:'Two Lines', category:'90-Ball', variants:[[R90,R90,E90],[R90,E90,R90],[E90,R90,R90]] },
+  { id:'ball90-full-house', name:'Full House', category:'90-Ball', variants:[[R90,R90,R90]] },
+];
+function patternsForSet(set){ return is90Ball(set) ? BALL90_PATTERNS : allPatterns(); }
+function currentSet(){ return vocabSets.find(s=>s.id===game.currentSetId); }
 function newPatternId(){ return 'pattern-'+Date.now()+'-'+Math.floor(Math.random()*1000); }
 
 /* True if a pattern needs a required (non-free) cell at row r, col c. */
@@ -594,7 +615,7 @@ function patternCellRequired(pattern, r, c){
    direction"; the Caller can toggle it per game (rotationOverrides). */
 const rotationOverrides = {};
 function rotationAllowed(pattern){
-  if(!pattern || pattern.anyLine) return false;
+  if(!pattern || pattern.anyLine || pattern.variants) return false;
   return (pattern.id in rotationOverrides) ? rotationOverrides[pattern.id] : !!pattern.rotate;
 }
 function rotateGrid(grid){
@@ -620,12 +641,13 @@ function allLineGrids(){
 function patternVariants(pattern){
   if(!pattern) return [];
   if(pattern.anyLine) return allLineGrids();
+  if(pattern.variants) return pattern.variants;
   return rotationAllowed(pattern) ? uniqueRotations(pattern.grid) : [pattern.grid];
 }
 /* True if this pattern could rotate into something different (so the
    "any direction" toggle is worth showing). */
 function patternCanRotate(pattern){
-  return !!pattern && !pattern.anyLine && uniqueRotations(pattern.grid).length > 1;
+  return !!pattern && !pattern.anyLine && !pattern.variants && uniqueRotations(pattern.grid).length > 1;
 }
 
 /* Column indices (0-4) that no winning variation needs besides the free
@@ -654,6 +676,7 @@ function patternExcludedColumns(pattern){
    what "B-I-N-G-O style" means here, whether the letters are literally B-I-N-G-O
    or something else entirely. */
 function patternIsApplicable(set){
+  if(is90Ball(set)) return true;
   return isStructuredSet(set) && getOrderedColumns(set.terms).length===5;
 }
 
@@ -675,6 +698,7 @@ function recomputePoolForPattern(){
 }
 
 function excludedLettersForSet(set){
+  if(is90Ball(set)) return [];
   const pattern = getPatternById(activePatternId);
   if(!patternIsApplicable(set) || pattern.anyLine) return [];
   const cols = getOrderedColumns(set.terms);
@@ -682,11 +706,13 @@ function excludedLettersForSet(set){
 }
 
 function renderPatternPreview(pattern, cellSize, grid){
-  const size = cellSize || 14;
-  let html = `<div style="display:grid;grid-template-columns:repeat(5,${size}px);gap:2px;">`;
-  for(let r=0;r<5;r++){
-    for(let c=0;c<5;c++){
-      const isFree = r===2 && c===2;
+  const g = grid || pattern.grid;
+  const rows = g ? g.length : 5, cols = g ? g[0].length : 5;
+  const size = cols > 5 ? Math.round((cellSize || 14) * 0.72) : (cellSize || 14);
+  let html = `<div style="display:grid;grid-template-columns:repeat(${cols},${size}px);gap:2px;">`;
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const isFree = rows===5 && cols===5 && r===2 && c===2;
       const filled = grid ? grid[r][c]==='1' : patternCellRequired(pattern, r, c);
       const bg = isFree ? '#f59e0b' : (filled ? '#16a34a' : '#cbd5e1');
       html += `<div style="width:${size}px;height:${size}px;border-radius:2px;background:${bg};"></div>`;
@@ -701,7 +727,7 @@ async function init(){
   await openDB();
   const stored = await dbGetAll(STORE);
   const storedPatterns = await dbGetAll(STORE_PATTERNS);
-  vocabSets = [STANDARD_SET, ...stored];
+  vocabSets = [STANDARD_SET, STANDARD90_SET, ...stored];
   customPatterns = storedPatterns;
   refreshSetSelectors();
   initVoiceSettings();
@@ -866,13 +892,21 @@ function loadGameForSet(setId){
   game.currentSetId = setId;
   game.called = [];
   document.getElementById('activeSetSelect').value = setId;
-  document.getElementById('modeLabel').textContent = set.type==='standard' ? '75-Ball Numbers' : 'Custom Vocabulary';
+  document.getElementById('modeLabel').textContent = set.type==='standard' ? '75-Ball Numbers' : (is90Ball(set) ? '90-Ball Numbers' : 'Custom Vocabulary');
+  // Switching between 75-ball and 90-ball uses a different family of games.
+  const fits = patternsForSet(set).some(p=>p.id===activePatternId);
+  if(!fits){
+    activePatternId = patternsForSet(set)[0].id;
+    gameProgression = []; progressionIndex = -1;
+    if(typeof renderProgressionList==='function') renderProgressionList();
+  }
+  populatePatternSelect();
   document.getElementById('totalCount').textContent = set.terms.length;
   document.getElementById('calledCount').textContent = 0;
   document.getElementById('callValue').textContent = '▶ Tap to Start';
   document.getElementById('callLetter').textContent = ' ';
   document.getElementById('callSubtitle').textContent = '';
-  document.getElementById('numberBoardPanel').style.display = isStructuredSet(set) ? 'block' : 'none';
+  document.getElementById('numberBoardPanel').style.display = (isStructuredSet(set) || is90Ball(set)) ? 'block' : 'none';
   document.getElementById('historyBox').innerHTML = '';
   setupNumberBoard();
   recomputePoolForPattern();
@@ -886,6 +920,12 @@ function loadGameForSet(setId){
 function setupNumberBoard(){
   const board = document.getElementById('numberBoard');
   const set = vocabSets.find(s=>s.id===game.currentSetId);
+  board.classList.toggle('board-90', is90Ball(set));
+  if(is90Ball(set)){
+    board.style.gridTemplateColumns = 'repeat(10, minmax(34px,1fr))';
+    board.innerHTML = set.terms.map((t,i)=>`<div class="board-cell" id="cell-${i}">${t.number}</div>`).join('');
+    return;
+  }
   if(!isStructuredSet(set)){ board.innerHTML=''; board.style.gridTemplateColumns=''; return; }
   const columns = getOrderedColumns(set.terms);
   const byCol = {};
@@ -924,7 +964,7 @@ function announce(set, termIdx){
   document.getElementById('callSubtitle').textContent = subtitleFor(term);
   document.getElementById('calledCount').textContent = game.called.length;
   document.getElementById('remainingLabel').textContent = game.pool.length;
-  if(isStructuredSet(set)){
+  if(isStructuredSet(set) || is90Ball(set)){
     const cell = document.getElementById('cell-'+termIdx);
     if(cell) cell.classList.add('called');
   }
@@ -1137,6 +1177,31 @@ function shuffle(arr){
   return a;
 }
 
+/* 90-ball ticket: 3 rows x 9 columns, 5 numbers per row (15 total), every
+   column used at least once. Column 1 is 1-9, column 2 is 10-19 ... column 9
+   is 80-90. Numbers in a column run top to bottom in ascending order. */
+function generate90BallTicket(){
+  const ranges = Array.from({length:9},(_,c)=>{
+    const lo = c===0 ? 1 : c*10, hi = c===8 ? 90 : c*10+9;
+    return Array.from({length:hi-lo+1},(_,i)=>lo+i);
+  });
+  for(let attempt=0; attempt<500; attempt++){
+    const counts = Array(9).fill(1);
+    let extra = 6;
+    while(extra>0){ const c = Math.floor(Math.random()*9); if(counts[c]<3){ counts[c]++; extra--; } }
+    const layout = counts.map(k => shuffle([0,1,2]).slice(0,k));
+    const rowTotals = [0,1,2].map(r => layout.filter(rows=>rows.includes(r)).length);
+    if(rowTotals.some(t=>t!==5)) continue;
+    const rows = [[],[],[]].map(()=>Array(9).fill(''));
+    layout.forEach((rs,c)=>{
+      const nums = shuffle(ranges[c]).slice(0, rs.length).sort((a,b)=>a-b);
+      rs.slice().sort().forEach((r,i)=>{ rows[r][c] = nums[i]; });
+    });
+    return { header:null, rows, ball90:true };
+  }
+  throw new Error('Could not build a 90-ball ticket, please try again.');
+}
+
 function generateStandardCard(){
   const cols = ['B','I','N','G','O'];
   const grid = [];
@@ -1210,6 +1275,8 @@ document.getElementById('generateCardsBtn').addEventListener('click', ()=>{
       let cardData;
       if(set.type==='standard'){
         cardData = generateStandardCard();
+      } else if(is90Ball(set)){
+        cardData = generate90BallTicket();
       } else {
         cardData = generateCustomCard(set.terms, gridSize, useFree);
       }
@@ -1222,13 +1289,13 @@ document.getElementById('generateCardsBtn').addEventListener('click', ()=>{
 
 function renderCardDOM(cardData, setName, cardNum){
   const wrap = document.createElement('div');
-  wrap.className = 'bingo-card';
+  wrap.className = 'bingo-card' + (cardData.ball90 ? ' ball90' : '');
   let html = `<div class="title">${cardData.header ? cardData.header.join(' ') : setName}</div><table>`;
   if(cardData.header){
     // standard card already row-major with header as columns
   }
   cardData.rows.forEach(row=>{
-    html += '<tr>' + row.map(cell=>`<td class="${cell==='FREE'?'free':''}">${cell}</td>`).join('') + '</tr>';
+    html += '<tr>' + row.map(cell=>`<td class="${cell==='FREE'?'free':''}${cell===''?' blank':''}">${cell}</td>`).join('') + '</tr>';
   });
   html += '</table>';
   wrap.innerHTML = html;
@@ -1248,12 +1315,12 @@ function renderSetList(){
     <div class="set-item">
       <div>
         <strong>${s.name}</strong>
-        <span class="badge ${s.type==='standard'?'tts':''}">${s.type==='standard'?'Built-in':(s.terms.length+' terms')}</span>
+        <span class="badge ${isBuiltinSet(s)?'tts':''}">${isBuiltinSet(s)?'Built-in':(s.terms.length+' terms')}</span>
       </div>
       <div class="row">
-        ${s.type!=='standard' ? `<button class="icon-btn" onclick="editSet('${s.id}')">Edit</button>` : ''}
-        ${s.type!=='standard' ? `<button class="icon-btn" onclick="exportSetById('${s.id}')">Export</button>` : ''}
-        ${s.type!=='standard' ? `<button class="icon-btn" onclick="deleteSet('${s.id}')">Delete</button>` : ''}
+        ${!isBuiltinSet(s) ? `<button class="icon-btn" onclick="editSet('${s.id}')">Edit</button>` : ''}
+        ${!isBuiltinSet(s) ? `<button class="icon-btn" onclick="exportSetById('${s.id}')">Export</button>` : ''}
+        ${!isBuiltinSet(s) ? `<button class="icon-btn" onclick="deleteSet('${s.id}')">Delete</button>` : ''}
       </div>
     </div>
   `).join('');
@@ -1591,7 +1658,7 @@ document.getElementById('importSetFile').addEventListener('change', async (e)=>{
 
 function populatePatternSelect(){
   const groups = {};
-  allPatterns().forEach(p=>{
+  patternsForSet(currentSet()).forEach(p=>{
     const cat = p.category || 'Custom';
     (groups[cat] = groups[cat] || []).push(p);
   });
@@ -1842,13 +1909,14 @@ function startProgression(){
   return true;
 }
 function openGamePicker(){
+  document.getElementById('preset90Btn').hidden = !is90Ball(currentSet());
   setPickerMode(progressionIndex>=0 ? 'list' : 'single');
   renderGameListBuilder();
   document.getElementById('gamePickerDialog').showModal();
 }
 function renderGamePickerList(){
   const groups = {};
-  allPatterns().forEach(p=>{ const cat = p.category || 'Custom'; (groups[cat] = groups[cat] || []).push(p); });
+  patternsForSet(currentSet()).forEach(p=>{ const cat = p.category || 'Custom'; (groups[cat] = groups[cat] || []).push(p); });
   const cats = Object.keys(groups).sort((a,b)=>{
     const ia = CATEGORY_ORDER.indexOf(a), ib = CATEGORY_ORDER.indexOf(b);
     return (ia<0?99:ia) - (ib<0?99:ib);
@@ -1884,6 +1952,10 @@ document.querySelectorAll('.mode-btn').forEach(b=>b.addEventListener('click', ()
 document.getElementById('startGameListBtn').addEventListener('click', ()=>{
   if(startProgression()) document.getElementById('gamePickerDialog').close();
 });
+document.getElementById('preset90Btn').addEventListener('click', ()=>{
+  gameProgression = BALL90_PATTERNS.map(p=>p.id); progressionIndex = -1;
+  renderProgressionList(); renderGameListBuilder(); renderGamePickerList();
+});
 document.getElementById('clearGameListBtn').addEventListener('click', ()=>{
   gameProgression = []; progressionIndex = -1;
   renderProgressionList(); renderGameListBuilder(); renderGamePickerList(); updatePatternUI();
@@ -1902,10 +1974,12 @@ function updatePatternUI(){
   const cols = getOrderedColumns(set.terms);
   const excludedLetters = excluded.map(i=>cols[i]);
   const variants = patternVariants(pattern);
-  const waysText = pattern.anyLine
+  const waysText = is90Ball(set)
+    ? (variants.length > 1 ? `Any ${pattern.id==='ball90-one-line'?'row':'two rows'} on the ticket (${variants.length} ways).` : 'Every number on the ticket.')
+    : pattern.anyLine
     ? 'Any row, column, or diagonal wins (12 ways).'
     : (variants.length > 1 ? `Wins in any direction (${variants.length} ways).` : '');
-  const colsText = pattern.anyLine ? ' Every column is in play.'
+  const colsText = is90Ball(set) ? '' : pattern.anyLine ? ' Every column is in play.'
     : (excludedLetters.length ? ` Column${excludedLetters.length>1?'s':''} ${excludedLetters.join(', ')} not needed, so skipped when calling.` : ' Every column is needed.');
   document.getElementById('patternNote').textContent = (waysText + colsText).trim();
   const rotRow = document.getElementById('rotateRow');
