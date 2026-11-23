@@ -404,6 +404,14 @@
               <input type="range" id="autoInterval" min="3" max="60" step="1" value="8">
             </div>
           </div>
+          <div class="row" style="margin-top:10px;">
+            <label class="rotate-row" style="font-size:0.95rem;"><input type="checkbox" id="bitesToggle" checked> 🎤 Fun sound bites (Aho!, Skoden, frybread…)</label>
+            <select id="bitesFreq" style="width:auto;">
+              <option value="0.12">Rarely</option>
+              <option value="0.25" selected>Sometimes</option>
+              <option value="0.5">Often</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
@@ -983,6 +991,7 @@ function getOrderedColumns(terms){
 }
 
 function loadGameForSet(setId){
+  if(typeof resetBiteCounters==='function') resetBiteCounters();
   const set = vocabSets.find(s=>s.id===setId);
   if(!set) return;
   game.currentSetId = setId;
@@ -1070,7 +1079,7 @@ function announce(set, termIdx){
   document.getElementById('historyBox').prepend(chip);
   bingoCalled = false;
   updateCallBox();
-  speakTerm(term);
+  speakWithBites(term);
 }
 
 function primaryDisplay(term){
@@ -1099,11 +1108,73 @@ function spokenLetter(letter){
   return LETTER_SOUNDS[letter.toUpperCase()] || letter.toLowerCase();
 }
 
-function speakTerm(term){
+/* HUNAP sound bites: Will's own recordings, played now and then.
+   intro: before a call. after: a quick reaction after a call.
+   bingo: when Bingo! is pressed. stretch: once, after a long run with no bingo. */
+const BITES = {
+  intro: ['aunties-next-number'],
+  opener: ['aunties-coffee-down'],
+  after: ['aho','stoodis','skoden','enit'],
+  bingo: ['aye-we-got-a-bingo','aye-we-have-a-bingo','victor-bingo-winner'],
+  stretch: ['frybread-getting-cold'],
+};
+const BITES_KEY = 'hunapSoundBites';
+const STRETCH_CALLS = 30;
+let callsSinceBingo = 0, stretchPlayed = false, currentBite = null, lastBite = null;
+function bitesOn(){ return document.getElementById('bitesToggle').checked; }
+function bitesChance(){ return parseFloat(document.getElementById('bitesFreq').value) || 0.25; }
+function pickBite(list){
+  const choices = list.length > 1 ? list.filter(b=>b!==lastBite) : list;
+  return choices[Math.floor(Math.random()*choices.length)];
+}
+function stopBite(){ if(currentBite){ currentBite.onended = currentBite.onerror = null; currentBite.pause(); currentBite = null; } }
+function playBite(name, onEnd, onFail){
+  stopBite();
+  lastBite = name;
+  const a = new Audio('sounds/' + name + '.mp3');
+  currentBite = a;
+  let done = false;
+  const finish = ok => { if(done) return; done = true; if(currentBite===a) currentBite = null; (ok ? onEnd : (onFail||onEnd))?.(); };
+  a.onended = () => finish(true);
+  a.onerror = () => finish(false);
+  const p = a.play();
+  if(p && p.catch) p.catch(() => finish(false));
+}
+function speakWithBites(term){
+  stopBite();
+  callsSinceBingo++;
+  if(!bitesOn()){ speakTerm(term); return; }
+  if(callsSinceBingo === 1 && game.called.length === 1 && Math.random() < 0.5){
+    playBite(pickBite(BITES.opener), () => speakTerm(term)); return;
+  }
+  if(callsSinceBingo >= STRETCH_CALLS && !stretchPlayed){
+    stretchPlayed = true;
+    speakTerm(term, () => playBite(pickBite(BITES.stretch))); return;
+  }
+  if(Math.random() < bitesChance()){
+    if(Math.random() < 0.35) playBite(pickBite(BITES.intro), () => speakTerm(term));
+    else speakTerm(term, () => playBite(pickBite(BITES.after)));
+    return;
+  }
+  speakTerm(term);
+}
+function resetBiteCounters(){ callsSinceBingo = 0; stretchPlayed = false; stopBite(); }
+(function initBites(){
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(BITES_KEY)) || {}; } catch(e){}
+  if(typeof saved.on === 'boolean') document.getElementById('bitesToggle').checked = saved.on;
+  if(saved.freq) document.getElementById('bitesFreq').value = saved.freq;
+  const save = () => localStorage.setItem(BITES_KEY, JSON.stringify({ on: bitesOn(), freq: document.getElementById('bitesFreq').value }));
+  document.getElementById('bitesToggle').addEventListener('change', save);
+  document.getElementById('bitesFreq').addEventListener('change', save);
+})();
+
+function speakTerm(term, onDone){
   speechSynthesis.cancel();
   if(term.audioBlob){
     const url = URL.createObjectURL(term.audioBlob);
     const audio = new Audio(url);
+    if(onDone) audio.onended = onDone;
     audio.play();
     return;
   }
@@ -1119,6 +1190,7 @@ function speakTerm(term){
       const numberUtter = new SpeechSynthesisUtterance(term.text);
       if(voice) numberUtter.voice = voice;
       numberUtter.rate = rate;
+      if(onDone) numberUtter.onend = onDone;
       setTimeout(()=>speechSynthesis.speak(numberUtter), delayMs);
     };
     speechSynthesis.speak(letterUtter);
@@ -1127,6 +1199,7 @@ function speakTerm(term){
     const utter = new SpeechSynthesisUtterance(text);
     if(voice) utter.voice = voice;
     utter.rate = rate;
+    if(onDone) utter.onend = onDone;
     speechSynthesis.speak(utter);
   }
 }
@@ -1229,11 +1302,15 @@ function declareBingo(){
   valueEl.classList.add('small');
   document.getElementById('callSubtitle').textContent = last ? `Last call: ${(last.letter||'') + ' ' + primaryDisplay(last)}`.trim() : '';
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance('We have a bingo!');
-  const voice = getSelectedVoice();
-  if(voice) u.voice = voice;
-  u.rate = parseFloat(document.getElementById('rateInput').value) || 0.9;
-  speechSynthesis.speak(u);
+  callsSinceBingo = 0;
+  const sayBingo = ()=>{
+    const u = new SpeechSynthesisUtterance('We have a bingo!');
+    const voice = getSelectedVoice();
+    if(voice) u.voice = voice;
+    u.rate = parseFloat(document.getElementById('rateInput').value) || 0.9;
+    speechSynthesis.speak(u);
+  };
+  if(bitesOn()) playBite(pickBite(BITES.bingo), null, sayBingo); else sayBingo();
   updateCallBox();
 }
 document.getElementById('currentCall').addEventListener('click', onCallBoxTap);
