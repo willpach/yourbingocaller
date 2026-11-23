@@ -594,6 +594,10 @@ const BUILTIN_PATTERNS = [
   { id:'line-3', name:'Line 3 (Middle Row)', category:'Lines', grid:['00000','00000','11111','00000','00000'] },
   { id:'line-4', name:'Line 4', category:'Lines', grid:['00000','00000','00000','11111','00000'] },
   { id:'line-5', name:'Line 5 (Bottom Row)', category:'Lines', grid:['00000','00000','00000','00000','11111'] },
+  { id:'harvard-h', name:'Harvard "H"', category:'Harvard', grid:['10001','10001','11111','10001','10001'] },
+  { id:'harvard-shield', name:'Crimson Shield', category:'Harvard', grid:['11111','10001','10001','01010','00100'] },
+  { id:'harvard-veritas', name:'Veritas Books', category:'Harvard', grid:['11011','11011','00000','01110','01110'] },
+  { id:'hunap-turtle', name:'HUNAP Turtle', category:'Harvard', grid:['00100','11111','01110','11111','00100'] },
   { id:'letter-x', name:'Letter "X"', category:'Letters', grid:['10001','01010','00100','01010','10001'] },
   { id:'letter-t', name:'Letter "T"', category:'Letters', grid:['11111','00100','00100','00100','00100'], rotate:true },
   { id:'letter-l', name:'Letter "L"', category:'Letters', grid:['10000','10000','10000','10000','11111'], rotate:true },
@@ -626,7 +630,8 @@ const BALL90_PATTERNS = [
 /* Combo games: any one of several patterns wins (e.g. X or T). Saved in the
    browser; one built-in example. */
 const COMBOS_KEY = 'hunapBingoCallerCombos';
-const BUILTIN_COMBOS = [ { id:'combo-x-or-t', name:'Letter "X" or "T"', category:'Combos', combo:['letter-x','letter-t'], builtin:true } ];
+const BUILTIN_COMBOS = [ { id:'combo-x-or-t', name:'Letter "X" or "T"', category:'Combos', combo:['letter-x','letter-t'], builtin:true },
+  { id:'combo-h-or-turtle', name:'Harvard "H" or Turtle', category:'Combos', combo:['harvard-h','hunap-turtle'], builtin:true } ];
 let savedCombos = (()=>{ try { return JSON.parse(localStorage.getItem(COMBOS_KEY)) || []; } catch(e){ return []; } })();
 function comboPatterns(){ return BUILTIN_COMBOS.concat(savedCombos); }
 function saveCombos(){ try { localStorage.setItem(COMBOS_KEY, JSON.stringify(savedCombos)); } catch(e){} }
@@ -1945,7 +1950,7 @@ function setActivePattern(id){
 }
 
 /* Picker shows the most-played shapes first. */
-const CATEGORY_ORDER = ['Classic','Combos','Letters','Shapes','Lines','Column Combos','Custom'];
+const CATEGORY_ORDER = ['Harvard','Classic','Combos','Letters','Shapes','Lines','Column Combos','Custom'];
 let pickerMode = 'single';
 function setPickerMode(mode){
   pickerMode = mode;
