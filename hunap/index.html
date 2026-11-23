@@ -1145,17 +1145,18 @@ function speakWithBites(term){
   callsSinceBingo++;
   const token = ++callToken;
   const done = () => callDone(token);
+  const live = f => (...a) => { if(token===callToken) f(...a); };
   if(!bitesOn()){ speakTerm(term, done); return; }
   if(callsSinceBingo === 1 && game.called.length === 1 && Math.random() < 0.5){
-    playBite(pickBite(BITES.opener), () => speakTerm(term, done)); return;
+    playBite(pickBite(BITES.opener), live(() => speakTerm(term, done))); return;
   }
   if(callsSinceBingo >= STRETCH_CALLS && !stretchPlayed){
     stretchPlayed = true;
-    speakTerm(term, () => playBite(pickBite(BITES.stretch), done)); return;
+    speakTerm(term, live(() => playBite(pickBite(BITES.stretch), done))); return;
   }
   if(Math.random() < bitesChance()){
-    if(Math.random() < 0.35) playBite(pickBite(BITES.intro), () => speakTerm(term, done));
-    else speakTerm(term, () => playBite(pickBite(BITES.after), done));
+    if(Math.random() < 0.35) playBite(pickBite(BITES.intro), live(() => speakTerm(term, done)));
+    else speakTerm(term, live(() => playBite(pickBite(BITES.after), done)));
     return;
   }
   speakTerm(term, done);
@@ -1171,8 +1172,10 @@ function resetBiteCounters(){ callsSinceBingo = 0; stretchPlayed = false; stopBi
   document.getElementById('bitesFreq').addEventListener('change', save);
 })();
 
+let speechGen = 0;
 function speakTerm(term, onDone){
   speechSynthesis.cancel();
+  const gen = ++speechGen;
   if(term.audioBlob){
     const url = URL.createObjectURL(term.audioBlob);
     const audio = new Audio(url);
@@ -1193,7 +1196,7 @@ function speakTerm(term, onDone){
       if(voice) numberUtter.voice = voice;
       numberUtter.rate = rate;
       if(onDone) numberUtter.onend = onDone;
-      setTimeout(()=>speechSynthesis.speak(numberUtter), delayMs);
+      setTimeout(()=>{ if(gen===speechGen) speechSynthesis.speak(numberUtter); }, delayMs);
     };
     speechSynthesis.speak(letterUtter);
   } else {
@@ -1332,6 +1335,7 @@ function declareBingo(){
   valueEl.classList.add('small');
   document.getElementById('callSubtitle').textContent = last ? `Last call: ${(last.letter||'') + ' ' + primaryDisplay(last)}`.trim() : '';
   speechSynthesis.cancel();
+  speechGen++; callToken++; stopBite();
   callsSinceBingo = 0;
   const sayBingo = ()=>{
     const u = new SpeechSynthesisUtterance('We have a bingo!');
