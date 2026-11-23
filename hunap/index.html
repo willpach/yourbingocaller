@@ -31,6 +31,11 @@
   .game-mode-shortcuts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
   .game-mode-shortcuts .btn{padding:8px 12px;font-size:0.85rem;}
   .game-mode-help{margin:2px 0 0;font-size:0.8rem;max-width:34em;}
+  .about-dialog{width:min(560px,92vw);}
+  .about-body{display:flex;gap:18px;align-items:flex-start;}
+  .about-turtle{width:90px;height:auto;flex:none;}
+  .about-body p{margin:0 0 12px;line-height:1.5;}
+  @media (max-width:500px){.about-body{flex-direction:column;align-items:center;}}
   .hunap-brand{display:flex;align-items:center;gap:14px;}
   .hunap-banner{height:54px;width:auto;}
   .hunap-brand span{border-left:2px solid var(--accent);padding-left:14px;color:var(--accent);font-weight:700;letter-spacing:0.5px;}
@@ -241,8 +246,24 @@
     <button class="navbtn" data-tab="cards">Cards</button>
     <button class="navbtn" data-tab="vocab">Vocabulary Sets</button>
     <button class="navbtn" data-tab="patterns">Patterns</button>
+    <button type="button" id="aboutBtn">About</button>
   </nav>
 </header>
+<dialog id="aboutDialog" class="game-dialog about-dialog">
+  <div class="game-dialog-head">
+    <h3 style="margin:0;">About this Bingo Caller</h3>
+    <button type="button" class="btn secondary" id="aboutClose">✕ Close</button>
+  </div>
+  <div class="about-body">
+    <img src="hunap-turtle.png" alt="" class="about-turtle">
+    <div>
+      <p>This bingo caller was made by <strong>Will</strong>, from <strong>Kewa</strong>. Will is a Harvard Graduate School of Education '24 alum and MIT '26.</p>
+      <p>Will loves HUNAP for all they do, and made this caller for the HUNAP community to play together.</p>
+      <p>Questions or ideas? Contact Will at <a href="mailto:wpacheco@unm.edu" style="color:var(--accent);">wpacheco@unm.edu</a>.</p>
+      <p class="hint">Built with help from Claude, an AI assistant made by Anthropic.</p>
+    </div>
+  </div>
+</dialog>
 
 <main>
 
@@ -1765,6 +1786,8 @@ document.getElementById('patternSelect').addEventListener('change', (e)=>{
   updatePatternUI();
 });
 document.getElementById('changeGameBtn').addEventListener('click', ()=>openGamePicker());
+document.getElementById('aboutBtn').addEventListener('click', ()=>document.getElementById('aboutDialog').showModal());
+document.getElementById('aboutClose').addEventListener('click', ()=>document.getElementById('aboutDialog').close());
 document.getElementById('comboShortcutBtn').addEventListener('click', ()=>openGamePicker('combo'));
 document.getElementById('progressiveShortcutBtn').addEventListener('click', ()=>openGamePicker('list'));
 document.getElementById('gamePickerClose').addEventListener('click', ()=>document.getElementById('gamePickerDialog').close());
