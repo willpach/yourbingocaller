@@ -1143,20 +1143,22 @@ function playBite(name, onEnd, onFail){
 function speakWithBites(term){
   stopBite();
   callsSinceBingo++;
-  if(!bitesOn()){ speakTerm(term); return; }
+  const token = ++callToken;
+  const done = () => callDone(token);
+  if(!bitesOn()){ speakTerm(term, done); return; }
   if(callsSinceBingo === 1 && game.called.length === 1 && Math.random() < 0.5){
-    playBite(pickBite(BITES.opener), () => speakTerm(term)); return;
+    playBite(pickBite(BITES.opener), () => speakTerm(term, done)); return;
   }
   if(callsSinceBingo >= STRETCH_CALLS && !stretchPlayed){
     stretchPlayed = true;
-    speakTerm(term, () => playBite(pickBite(BITES.stretch))); return;
+    speakTerm(term, () => playBite(pickBite(BITES.stretch), done)); return;
   }
   if(Math.random() < bitesChance()){
-    if(Math.random() < 0.35) playBite(pickBite(BITES.intro), () => speakTerm(term));
-    else speakTerm(term, () => playBite(pickBite(BITES.after)));
+    if(Math.random() < 0.35) playBite(pickBite(BITES.intro), () => speakTerm(term, done));
+    else speakTerm(term, () => playBite(pickBite(BITES.after), done));
     return;
   }
-  speakTerm(term);
+  speakTerm(term, done);
 }
 function resetBiteCounters(){ callsSinceBingo = 0; stretchPlayed = false; stopBite(); }
 (function initBites(){
@@ -1251,17 +1253,45 @@ function resetGame(){
   loadGameForSet(game.currentSetId);
 }
 
+/* Auto-play waits for each call to finish (sound bite + spoken number +
+   any reaction) before counting down to the next one, so a long clip can
+   never cut off the number. The interval is measured from the start of a
+   call, with at least a short pause after the voice finishes. */
+let autoSeq = 0, pendingCallDone = null, callToken = 0;
+const MIN_GAP_MS = 1500, MAX_CALL_MS = 20000;
+function callDone(token){
+  if(token !== callToken) return;
+  const f = pendingCallDone; pendingCallDone = null;
+  if(f) f();
+}
+function autoStep(seq){
+  if(seq !== autoSeq || !autoTimer) return;
+  if(game.pool.length === 0){ drawNext(); stopAuto(); return; }
+  const started = Date.now();
+  autoTimer = -1;
+  let fired = false;
+  const next = () => {
+    if(fired) return; fired = true;
+    clearTimeout(safety);
+    if(seq !== autoSeq || !autoTimer) return;
+    const secs = Math.max(3, parseInt(document.getElementById('autoInterval').value)||8);
+    const wait = Math.max(MIN_GAP_MS, secs*1000 - (Date.now() - started));
+    autoTimer = setTimeout(()=>autoStep(seq), wait);
+  };
+  const safety = setTimeout(next, MAX_CALL_MS);
+  pendingCallDone = next;
+  drawNext();
+}
 function stopAuto(){
-  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+  if(autoTimer){ clearTimeout(autoTimer); autoTimer=null; autoSeq++; pendingCallDone = null; }
   document.getElementById('autoBtn').textContent = '▶ Auto-Play';
   updateCallBox();
 }
 function toggleAuto(){
   if(autoTimer){ stopAuto(); return; }
   bingoCalled = false;
-  const secs = Math.max(3, parseInt(document.getElementById('autoInterval').value)||8);
-  drawNext();
-  autoTimer = setInterval(drawNext, secs*1000);
+  autoTimer = -1;
+  autoStep(++autoSeq);
   document.getElementById('autoBtn').textContent = '⏸ Stop Auto';
   updateCallBox();
 }
