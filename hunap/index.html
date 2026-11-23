@@ -16,6 +16,21 @@
   header{padding:18px 24px;background:var(--panel);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;border-bottom:1px solid var(--border);}
   header h1{margin:0;font-size:1.4rem;}
   header{background:#f1f2f2;}
+  /* HUNAP: black and crimson title bar */
+  header{background:#1e1e1e !important;border-bottom:4px solid var(--accent);}
+  .hunap-banner{background:#f1f2f2;border-radius:8px;padding:4px 8px;}
+  .hunap-brand span{color:#fff !important;}
+  header nav button{background:#2e2e2e;color:#eee;border-color:#444;}
+  header nav button:hover{background:#3a3a3a;}
+  header nav button.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  /* HUNAP: stronger section borders */
+  .caller-row > .panel:not(.callboard){border:2px solid var(--accent);box-shadow:0 2px 8px rgba(165,28,48,0.10);}
+  /* HUNAP: slightly smaller board */
+  #numberBoard:not(.board-90) .board-cell{aspect-ratio:1.6;}
+  #patternBar{gap:4px;}
+  .game-mode-shortcuts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  .game-mode-shortcuts .btn{padding:8px 12px;font-size:0.85rem;}
+  .game-mode-help{margin:2px 0 0;font-size:0.8rem;max-width:34em;}
   .hunap-brand{display:flex;align-items:center;gap:14px;}
   .hunap-banner{height:54px;width:auto;}
   .hunap-brand span{border-left:2px solid var(--accent);padding-left:14px;color:var(--accent);font-weight:700;letter-spacing:0.5px;}
@@ -62,7 +77,7 @@
      Then called numbers, then the full board. Portrait tablets put the
      number box on its own row; phones stack everything. */
   .caller-row{display:grid;gap:20px;margin-bottom:20px;
-    grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr);
+    grid-template-columns:minmax(0,0.85fr) minmax(0,1.2fr) minmax(0,1fr);
     grid-template-areas:"call pattern info" "history history history" "board board board";}
   .caller-row > .panel{margin-bottom:0;}
   .caller-row .callboard{grid-area:call;padding:0;}
@@ -256,6 +271,11 @@
         <div id="patternNote" class="hint"></div>
         <div id="gameListStatus" class="game-list-status"></div>
         <button type="button" class="btn secondary" id="changeGameBtn">🎯 Change Game</button>
+        <div class="game-mode-shortcuts">
+          <button type="button" class="btn secondary" id="comboShortcutBtn">🔀 Combo Game</button>
+          <button type="button" class="btn secondary" id="progressiveShortcutBtn">🪜 Progressive Games</button>
+        </div>
+        <p class="hint game-mode-help"><strong>Combo:</strong> any of several patterns wins. <strong>Progressive:</strong> games in a row on the same card, each with a new pattern.</p>
       </div>
 
     <div class="panel info-panel" id="infoPanel">
@@ -298,8 +318,8 @@
       </div>
       <div class="picker-modes" role="tablist">
         <button type="button" class="mode-btn active" data-mode="single">One game</button>
-        <button type="button" class="mode-btn" data-mode="list">Game list (several in a row)</button>
-        <button type="button" class="mode-btn" data-mode="combo" id="comboModeBtn">Combo (X or T…)</button>
+        <button type="button" class="mode-btn" data-mode="list">Progressive games</button>
+        <button type="button" class="mode-btn" data-mode="combo" id="comboModeBtn">Combo game</button>
       </div>
       <div id="comboBuilder" class="game-list-builder" hidden>
         <p class="hint" style="margin-top:0;">Tap two or more games below. A player wins with <strong>any</strong> of them.</p>
@@ -310,7 +330,7 @@
         </div>
       </div>
       <div id="gameListBuilder" class="game-list-builder" hidden>
-        <p class="hint" style="margin-top:0;">Tap games below to add them in order. Called numbers carry over between games; the last one is the final game.</p>
+        <p class="hint" style="margin-top:0;">Progressive games are played one after another on the same card, each with a new pattern. Tap games below to add them in order. Called numbers stay marked between games, and the last one is the final game.</p>
         <ol id="gameListItems" class="game-list-items"></ol>
         <div class="row">
           <button type="button" class="btn green" id="startGameListBtn">▶ Start Games</button>
@@ -1744,7 +1764,9 @@ document.getElementById('patternSelect').addEventListener('change', (e)=>{
   recomputePoolForPattern();
   updatePatternUI();
 });
-document.getElementById('changeGameBtn').addEventListener('click', openGamePicker);
+document.getElementById('changeGameBtn').addEventListener('click', ()=>openGamePicker());
+document.getElementById('comboShortcutBtn').addEventListener('click', ()=>openGamePicker('combo'));
+document.getElementById('progressiveShortcutBtn').addEventListener('click', ()=>openGamePicker('list'));
 document.getElementById('gamePickerClose').addEventListener('click', ()=>document.getElementById('gamePickerDialog').close());
 document.getElementById('gamePickerDialog').addEventListener('click', (e)=>{ if(e.target.id==='gamePickerDialog') e.target.close(); });
 document.getElementById('rotateToggle').addEventListener('change', (e)=>{
@@ -1933,7 +1955,7 @@ function startPatternAnimation(pattern, variants){
   const counter = document.getElementById('patternVariantCount');
   let i = 0;
   const show = () => {
-    box.innerHTML = renderPatternPreview(pattern, 26, variants[i]);
+    box.innerHTML = renderPatternPreview(pattern, 30, variants[i]);
     counter.textContent = variants.length > 1 ? `${i+1} / ${variants.length}` : '';
   };
   show();
@@ -1982,11 +2004,11 @@ function startProgression(){
   toast('Game 1: ' + getPatternById(activePatternId).name);
   return true;
 }
-function openGamePicker(){
+function openGamePicker(mode){
   document.getElementById('preset90Btn').hidden = !is90Ball(currentSet());
   document.getElementById('comboModeBtn').hidden = is90Ball(currentSet());
   comboDraft = [];
-  setPickerMode(progressionIndex>=0 ? 'list' : 'single');
+  setPickerMode(mode || (progressionIndex>=0 ? 'list' : 'single'));
   renderGameListBuilder();
   document.getElementById('gamePickerDialog').showModal();
 }
