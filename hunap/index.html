@@ -4,19 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HUNAP Bingo Caller</title>
+<link rel="icon" href="hunap-turtle.png">
 <style>
   :root{
-    --bg:#f7f4ee; --panel:#ffffff; --panel2:#f1f5f9; --accent:#f59e0b; --accent2:#16a34a;
-    --accent-text:#b45309; --border:#e2e8f0; --border2:#cbd5e1; --field:#ffffff;
-    --text:#1e293b; --muted:#64748b; --danger:#ef4444; --card:#ffffff; --cardtext:#0f172a;
+    --bg:#f1f2f1; --panel:#ffffff; --panel2:#f4f4f4; --accent:#a51c30; --accent2:#1e1e1e;
+    --accent-text:#a51c30; --border:#e2e8f0; --border2:#cbd5e1; --field:#ffffff;
+    --text:#1e1e1e; --muted:#64748b; --danger:#4a4a4a; --card:#ffffff; --cardtext:#0f172a;
   }
   *{box-sizing:border-box;}
   body{margin:0;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
   header{padding:18px 24px;background:var(--panel);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;border-bottom:1px solid var(--border);}
   header h1{margin:0;font-size:1.4rem;}
+  header{background:#f1f2f2;}
+  .hunap-brand{display:flex;align-items:center;gap:14px;}
+  .hunap-banner{height:54px;width:auto;}
+  .hunap-brand span{border-left:2px solid var(--accent);padding-left:14px;color:var(--accent);font-weight:700;letter-spacing:0.5px;}
+  @media (max-width:700px){.hunap-banner{height:48px;}}
   nav{display:flex;gap:8px;flex-wrap:wrap;}
   nav button{background:var(--panel2);color:var(--text);border:1px solid var(--border);padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.95rem;}
-  nav button.active{background:var(--accent);color:#1a1a1a;font-weight:600;border-color:var(--accent);}
+  nav button.active{background:var(--accent);color:#ffffff;font-weight:600;border-color:var(--accent);}
   main{padding:20px 24px;max-width:1300px;margin:0 auto;}
   .tab{display:none;}
   .tab.active{display:block;}
@@ -27,7 +33,7 @@
     background:var(--field);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:0.95rem;width:100%;
   }
   textarea{min-height:140px;font-family:monospace;resize:vertical;}
-  button.btn{background:var(--accent);color:#1a1a1a;border:none;padding:10px 18px;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.95rem;}
+  button.btn{background:var(--accent);color:#ffffff;border:none;padding:10px 18px;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.95rem;}
   button.btn.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border2);}
   button.btn.danger{background:var(--danger);color:#fff;}
   button.btn.green{background:var(--accent2);color:#fff;}
@@ -46,7 +52,7 @@
   .slider-field{flex:1 1 160px;}
   .tips-box:empty{display:none;}
   .tips-box{margin-top:14px;display:flex;flex-direction:column;gap:8px;}
-  .tip{position:relative;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 36px 10px 12px;font-size:0.85rem;line-height:1.45;color:var(--text);}
+  .tip{position:relative;background:#fbf3f4;border:1px solid #e8b7bf;border-radius:8px;padding:10px 36px 10px 12px;font-size:0.85rem;line-height:1.45;color:var(--text);}
   .tip strong{display:block;margin-bottom:2px;}
   .tip .tip-path{font-weight:600;color:var(--accent-text);}
   .tip button.tip-close{position:absolute;top:6px;right:6px;background:none;border:none;font-size:1rem;line-height:1;color:var(--muted);cursor:pointer;padding:4px 6px;border-radius:4px;}
@@ -85,13 +91,13 @@
   .picker-modes{display:flex;gap:6px;margin:4px 0 12px;background:var(--panel2);padding:4px;border-radius:10px;width:fit-content;max-width:100%;flex-wrap:wrap;}
   .mode-btn{border:none;background:none;padding:8px 14px;border-radius:8px;font:inherit;font-weight:600;font-size:0.9rem;color:var(--muted);cursor:pointer;}
   .mode-btn.active{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(15,23,42,0.12);}
-  .game-list-builder{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px;}
+  .game-list-builder{background:#fbf3f4;border:1px solid #e8b7bf;border-radius:10px;padding:12px 14px;margin-bottom:12px;}
   .game-list-items{margin:0 0 10px;padding-left:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px;}
   .game-list-items:empty::before{content:'No games yet — tap one below.';color:var(--muted);font-size:0.85rem;}
   .game-list-items li{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--border2);border-radius:999px;padding:4px 6px 4px 12px;font-size:0.85rem;font-weight:600;}
   .game-list-items li .final{color:var(--accent-text);font-weight:700;font-size:0.75rem;text-transform:uppercase;}
   .game-list-items li button{border:none;background:var(--panel2);border-radius:999px;width:22px;height:22px;cursor:pointer;color:var(--muted);}
-  .game-option .list-num{position:absolute;top:6px;left:6px;background:var(--accent);color:#1a1a1a;border-radius:999px;font-size:0.7rem;padding:1px 7px;font-weight:700;}
+  .game-option .list-num{position:absolute;top:6px;left:6px;background:var(--accent);color:#ffffff;border-radius:999px;font-size:0.7rem;padding:1px 7px;font-weight:700;}
   .game-option{position:relative;}
   .combo-or{color:var(--muted);font-weight:600;font-size:0.8rem;align-self:center;}
   .game-option .del-combo{position:absolute;top:4px;right:6px;font-size:0.8rem;color:var(--muted);padding:2px 5px;border-radius:4px;}
@@ -99,13 +105,13 @@
   .game-list-status{font-size:0.85rem;font-weight:600;color:var(--accent-text);}
   .game-list-status:empty{display:none;}
   .game-option small{font-weight:400;color:var(--muted);font-size:0.75rem;}
-  .game-option.selected{border-color:var(--accent);background:#fffbeb;}
+  .game-option.selected{border-color:var(--accent);background:#fbf3f4;}
   .game-option:active{transform:scale(0.97);}
   .callboard{display:flex;flex-direction:column;align-items:center;gap:16px;}
   .current-call{
     container-type:size;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;position:relative;transition:transform 0.1s;
     width:100%;height:100%;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    background:radial-gradient(circle at top, #fffbeb, #fef3c7);border:2px solid var(--accent);border-radius:16px;padding:16px;text-align:center;
+    background:radial-gradient(circle at top, #fbf3f4, #f6e4e7);border:2px solid var(--accent);border-radius:16px;padding:16px;text-align:center;
   }
   .current-call .letter{font-size:clamp(1.1rem,2.4vw,1.8rem);color:var(--accent-text);letter-spacing:3px;font-weight:700;}
   .current-call .value{font-size:clamp(2.6rem,7vw,5.2rem);font-weight:800;line-height:1.05;word-break:break-word;}
@@ -117,7 +123,7 @@
   .current-call .value{font-size:min(50cqh,52cqw);line-height:1;}
   .current-call .value.small{font-size:min(14cqh,13cqw);line-height:1.15;}
   .current-call .call-status{font-size:min(7cqh,7cqw);color:var(--muted);margin-top:4px;min-height:1.2em;}
-  .bingo-btn{position:absolute;top:10px;right:10px;background:#7c3aed;color:#fff;border:none;border-radius:999px;padding:6px 12px;font-size:0.85rem;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .bingo-btn{position:absolute;top:10px;right:10px;background:#1e1e1e;color:#fff;border:none;border-radius:999px;padding:6px 12px;font-size:0.85rem;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
   .bingo-btn:active{transform:scale(0.95);}
   .current-call.not-started .bingo-btn, .current-call.is-bingo .bingo-btn{display:none;}
   .current-call.is-bingo{background:radial-gradient(circle at top,#f5f3ff,#ddd6fe);border-color:#7c3aed;}
@@ -136,7 +142,7 @@
   .board-grid{display:grid;grid-template-columns:repeat(15,minmax(34px,1fr));gap:5px;width:100%;}
   .board-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--panel2);border-radius:4px;font-size:0.8rem;color:var(--muted);border:1px solid var(--border);}
   .board-90 .board-cell{aspect-ratio:1.7;font-size:0.9rem;}
-  .board-cell.called{background:var(--accent);color:#1a1a1a;font-weight:700;}
+  .board-cell.called{background:var(--accent);color:#ffffff;font-weight:700;}
   #numberBoardPanel{overflow-x:auto;}
   #patternBar{display:flex;flex-direction:column;align-items:center;text-align:center;justify-content:center;gap:6px;}
   #patternName{font-weight:700;}
@@ -167,7 +173,7 @@
   .bingo-card .title{text-align:center;font-weight:800;letter-spacing:3px;font-size:1.1rem;margin-bottom:6px;color:#0f172a;}
   .bingo-card table{width:100%;border-collapse:collapse;table-layout:fixed;}
   .bingo-card td{border:1px solid #cbd5e1;text-align:center;font-size:0.75rem;padding:6px 2px;height:44px;vertical-align:middle;overflow:hidden;word-break:break-word;}
-  .bingo-card td.free{background:#fef3c7;font-weight:700;}
+  .bingo-card td.free{background:#f6e4e7;font-weight:700;}
   .bingo-card.ball90{grid-column:span 2;}
   .bingo-card.ball90 td{font-size:1rem;font-weight:600;height:40px;}
   .bingo-card.ball90 td.blank{background:#f1f5f9;}
@@ -198,7 +204,7 @@
   .designer-grid{display:grid;grid-template-columns:repeat(5,56px);gap:5px;margin:14px 0;}
   .designer-cell{width:56px;height:56px;border:2px solid var(--border2);border-radius:6px;cursor:pointer;background:var(--panel2);}
   .designer-cell.required{background:var(--accent2);border-color:var(--accent2);}
-  .designer-cell.free{background:#fef3c7;border-color:#fef3c7;cursor:default;}
+  .designer-cell.free{background:#f6e4e7;border-color:#f6e4e7;cursor:default;}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid var(--accent2);color:#f8fafc;padding:10px 20px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity 0.3s;z-index:99;}
   .toast.show{opacity:1;}
 
@@ -214,7 +220,7 @@
 <body>
 
 <header>
-  <h1>🎱 HUNAP Bingo Caller</h1>
+  <h1 class="hunap-brand"><img src="hunap-banner.png" alt="Harvard University Native American Program" class="hunap-banner"><span>Bingo Caller</span></h1>
   <nav>
     <button class="navbtn active" data-tab="caller">Caller</button>
     <button class="navbtn" data-tab="cards">Cards</button>
@@ -758,7 +764,7 @@ function renderPatternPreview(pattern, cellSize, grid){
     for(let c=0;c<cols;c++){
       const isFree = rows===5 && cols===5 && r===2 && c===2;
       const filled = grid ? grid[r][c]==='1' : patternCellRequired(pattern, r, c);
-      const bg = isFree ? '#f59e0b' : (filled ? '#16a34a' : '#cbd5e1');
+      const bg = isFree ? '#1e1e1e' : (filled ? '#a51c30' : '#cbd5e1');
       html += `<div style="width:${size}px;height:${size}px;border-radius:2px;background:${bg};"></div>`;
     }
   }
